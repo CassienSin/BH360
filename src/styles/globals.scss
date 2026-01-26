@@ -1,0 +1,356 @@
+// Global styles for BH360 Barangay Management System
+
+// Import Inter font from Google Fonts
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+// Design tokens
+$primary-color: #6366F1;
+$secondary-color: #EC4899;
+$success-color: #10B981;
+$error-color: #EF4444;
+$warning-color: #F59E0B;
+$info-color: #3B82F6;
+
+$bg-default: #F8FAFC;
+$bg-paper: rgba(255, 255, 255, 0.8);
+
+$text-primary: #1E293B;
+$text-secondary: #64748B;
+$text-disabled: #94A3B8;
+
+$grey-50: #F8FAFC;
+$grey-100: #F1F5F9;
+$grey-200: #E2E8F0;
+$grey-300: #CBD5E1;
+$grey-400: #94A3B8;
+$grey-500: #64748B;
+$grey-600: #475569;
+$grey-700: #334155;
+$grey-800: #1E293B;
+$grey-900: #0F172A;
+
+$border-radius: 12px;
+$border-radius-lg: 16px;
+$border-radius-sm: 8px;
+
+// Blur values
+$blur-sm: 4px;
+$blur-md: 10px;
+$blur-lg: 20px;
+$blur-xl: 40px;
+
+// Animation durations
+$transition-fast: 0.15s;
+$transition-base: 0.3s;
+$transition-slow: 0.5s;
+
+// Gradients
+$gradient-primary: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+$gradient-secondary: linear-gradient(135deg, #EC4899 0%, #F43F5E 100%);
+$gradient-success: linear-gradient(135deg, #10B981 0%, #059669 100%);
+$gradient-bg: linear-gradient(135deg, #F8FAFC 0%, #E0E7FF 50%, #FECDD3 100%);
+
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+$spacing-xxl: 48px;
+
+// Global resets and base styles
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  font-family: 'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: $gradient-bg;
+  background-attachment: fixed;
+  color: $text-primary;
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+// Scrollbar styling
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: $grey-100;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $grey-300;
+  border-radius: 4px;
+
+  &:hover {
+    background: $grey-400;
+  }
+}
+
+// Utility classes
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.full-height {
+  height: 100%;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+// Status badge colors
+.status-badge {
+  padding: 4px 12px;
+  border-radius: $border-radius-sm;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+
+  &.submitted {
+    background-color: #E3F2FD;
+    color: #1976D2;
+  }
+
+  &.in-progress {
+    background-color: #FFF3E0;
+    color: #F57C00;
+  }
+
+  &.resolved {
+    background-color: #E8F5E9;
+    color: #2E7D32;
+  }
+
+  &.urgent {
+    background-color: #FFEBEE;
+    color: #C62828;
+  }
+
+  &.minor {
+    background-color: #F3E5F5;
+    color: #7B1FA2;
+  }
+}
+
+// Priority indicators
+.priority-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+
+  &.low {
+    background-color: $success-color;
+  }
+
+  &.medium {
+    background-color: $warning-color;
+  }
+
+  &.high {
+    background-color: $error-color;
+  }
+}
+
+// Card shadow variants
+.card-elevated {
+  box-shadow: 0px 4px 12px rgba(15, 23, 42, 0.1);
+  transition: box-shadow 0.3s ease;
+
+  &:hover {
+    box-shadow: 0px 8px 24px rgba(15, 23, 42, 0.15);
+  }
+}
+
+// React Toastify custom styles
+.Toastify__toast {
+  border-radius: $border-radius;
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0px 4px 12px rgba(15, 23, 42, 0.1);
+}
+
+.Toastify__toast--success {
+  background-color: $success-color;
+}
+
+.Toastify__toast--error {
+  background-color: $error-color;
+}
+
+.Toastify__toast--warning {
+  background-color: $warning-color;
+}
+
+.Toastify__toast--info {
+  background-color: $info-color;
+}
+
+// Glassmorphism classes
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur($blur-md);
+  -webkit-backdrop-filter: blur($blur-md);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+}
+
+.glass-dark {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur($blur-md);
+  -webkit-backdrop-filter: blur($blur-md);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+// Animation classes
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn $transition-base ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft $transition-base ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight $transition-base ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn $transition-base ease-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+// Hover effects
+.hover-lift {
+  transition: all $transition-base ease;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(99, 102, 241, 0.2);
+  }
+}
+
+.hover-glow {
+  transition: all $transition-base ease;
+  
+  &:hover {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+  }
+}
+
+// Gradient text
+.gradient-text {
+  background: $gradient-primary;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+// Gradient backgrounds
+.gradient-bg-primary {
+  background: $gradient-primary;
+}
+
+.gradient-bg-secondary {
+  background: $gradient-secondary;
+}
+
+.gradient-bg-success {
+  background: $gradient-success;
+}
