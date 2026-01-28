@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -5,6 +6,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { CacheProvider } from '@emotion/react';
 import createCache from '@emotion/cache';
 import CssBaseline from '@mui/material/CssBaseline';
+import { CircularProgress, Box } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -14,29 +16,30 @@ import { queryClient } from './api/queryClient';
 import { useAuthPersistence } from './hooks/useAuthPersistence';
 import './styles/globals.scss';
 
-// Layouts
+// Layouts (keep these as they're always needed)
 import MainLayout from './components/layout/MainLayout';
 import AuthLayout from './components/layout/AuthLayout';
 
-// Auth Guards
+// Auth Guards (keep these as they're always needed)
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import PublicRoute from './components/auth/PublicRoute';
 
-// Pages
-import Dashboard from './pages/Dashboard/Dashboard';
-import Login from './pages/Auth/Login';
-import Register from './pages/Auth/Register';
-import IncidentList from './pages/Incidents/IncidentList';
-import IncidentDetails from './pages/Incidents/IncidentDetails';
-import IncidentCreate from './pages/Incidents/IncidentCreate';
-import TanodManagement from './pages/Tanod/TanodManagement';
-import TaskManagement from './pages/Tanod/TaskManagement';
-import UserManagement from './pages/Users/UserManagement';
-import AIHelpDesk from './pages/HelpDesk/AIHelpDesk';
-import TicketManagement from './pages/HelpDesk/TicketManagement';
-import Announcements from './pages/Announcements/Announcements';
-import Analytics from './pages/Analytics/Analytics';
-import Profile from './pages/Profile/Profile';
+// Lazy load all pages for better performance
+const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
+const Login = lazy(() => import('./pages/Auth/Login'));
+const Register = lazy(() => import('./pages/Auth/Register'));
+const IncidentList = lazy(() => import('./pages/Incidents/IncidentList'));
+const IncidentDetails = lazy(() => import('./pages/Incidents/IncidentDetails'));
+const IncidentCreate = lazy(() => import('./pages/Incidents/IncidentCreate'));
+const TanodManagement = lazy(() => import('./pages/Tanod/TanodManagement'));
+const TaskManagement = lazy(() => import('./pages/Tanod/TaskManagement'));
+const PerformanceInsights = lazy(() => import('./pages/Tanod/PerformanceInsights'));
+const UserManagement = lazy(() => import('./pages/Users/UserManagement'));
+const AIHelpDesk = lazy(() => import('./pages/HelpDesk/AIHelpDesk'));
+const TicketManagement = lazy(() => import('./pages/HelpDesk/TicketManagement'));
+const Announcements = lazy(() => import('./pages/Announcements/Announcements'));
+const Analytics = lazy(() => import('./pages/Analytics/Analytics'));
+const Profile = lazy(() => import('./pages/Profile/Profile'));
 
 // Create emotion cache with prepend for MUI styles
 const createEmotionCache = () => {
@@ -48,6 +51,21 @@ const createEmotionCache = () => {
 
 const emotionCache = createEmotionCache();
 
+// Loading fallback component
+const PageLoader = () => (
+  <Box
+    sx={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #F8FAFC 0%, #E0E7FF 50%, #FECDD3 100%)',
+    }}
+  >
+    <CircularProgress size={48} />
+  </Box>
+);
+
 // Auth persistence component
 const AppContent = () => {
   useAuthPersistence();
@@ -55,7 +73,8 @@ const AppContent = () => {
   return (
     <>
       <Router>
-        <Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
           {/* Default Route - Redirect to Login */}
           <Route path="/" element={<Navigate to="/login" replace />} />
 
@@ -93,6 +112,7 @@ const AppContent = () => {
             <Route path="/incidents/:id" element={<IncidentDetails />} />
             <Route path="/tasks" element={<TaskManagement />} />
             <Route path="/tanod" element={<TanodManagement />} />
+            <Route path="/tanod/performance" element={<PerformanceInsights />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/helpdesk" element={<AIHelpDesk />} />
             <Route path="/tickets" element={<TicketManagement />} />
@@ -103,7 +123,8 @@ const AppContent = () => {
 
           {/* 404 - Redirect to Login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </Router>
       <ToastContainer
         position="top-right"

@@ -125,6 +125,16 @@ const ticketSlice = createSlice({
     deleteTicket: (state, action) => {
       state.tickets = state.tickets.filter((ticket) => ticket.id !== action.payload);
     },
+    addFeedbackToTicket: (state, action) => {
+      const ticket = state.tickets.find((t) => t.id === action.payload.ticketId);
+      if (ticket) {
+        if (!ticket.feedback) {
+          ticket.feedback = [];
+        }
+        ticket.feedback.push(action.payload.feedback);
+        ticket.updatedAt = new Date();
+      }
+    },
     setLoading: (state, action) => {
       state.loading = action.payload;
     },
@@ -138,6 +148,7 @@ export const {
   updateTicketPriority,
   assignTicket,
   deleteTicket,
+  addFeedbackToTicket,
   setLoading,
 } = ticketSlice.actions;
 export default ticketSlice.reducer;

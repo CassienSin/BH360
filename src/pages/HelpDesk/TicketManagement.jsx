@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Circle,
+  Star,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import {
@@ -42,6 +43,7 @@ import {
 import { addNotification } from '../../store/slices/notificationSlice';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
+import FeedbackCard from '../../components/feedback/FeedbackCard';
 
 const TicketManagement = () => {
   const theme = useTheme();
@@ -355,6 +357,14 @@ const TicketManagement = () => {
                           {format(new Date(ticket.createdAt), 'MMM dd, yyyy HH:mm')}
                         </Typography>
                       </Stack>
+                      {ticket.feedback && ticket.feedback.length > 0 && (
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Star size={14} color={theme.palette.warning.main} />
+                          <Typography variant="caption" color="text.secondary">
+                            Rated {ticket.feedback[0].overallRating.toFixed(1)}/5.0
+                          </Typography>
+                        </Stack>
+                      )}
                     </Stack>
                   </Stack>
                 </CardContent>
@@ -478,66 +488,87 @@ const TicketManagement = () => {
 
               {/* Messages */}
               <Box sx={{ p: 3, maxHeight: '400px', overflow: 'auto' }}>
-                <Stack spacing={2}>
-                  {selectedTicket.messages.map((message) => (
-                    <Stack
-                      key={message.id}
-                      direction="row"
-                      spacing={1.5}
-                      justifyContent={message.sender === 'user' ? 'flex-end' : 'flex-start'}
-                    >
-                      {message.sender !== 'user' && (
-                        <Avatar
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor:
-                              message.sender === 'bot'
-                                ? theme.palette.primary.main
-                                : theme.palette.secondary.main,
-                          }}
-                        >
-                          {message.sender === 'bot' ? (
-                            <AlertCircle size={16} />
-                          ) : (
+                <Stack spacing={3}>
+                  {/* Conversation Messages */}
+                  <Stack spacing={2}>
+                    {selectedTicket.messages.map((message) => (
+                      <Stack
+                        key={message.id}
+                        direction="row"
+                        spacing={1.5}
+                        justifyContent={message.sender === 'user' ? 'flex-end' : 'flex-start'}
+                      >
+                        {message.sender !== 'user' && (
+                          <Avatar
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              bgcolor:
+                                message.sender === 'bot'
+                                  ? theme.palette.primary.main
+                                  : theme.palette.secondary.main,
+                            }}
+                          >
+                            {message.sender === 'bot' ? (
+                              <AlertCircle size={16} />
+                            ) : (
+                              <User size={16} />
+                            )}
+                          </Avatar>
+                        )}
+                        <Stack spacing={0.5} sx={{ maxWidth: '70%' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {message.senderName} •{' '}
+                            {format(new Date(message.timestamp), 'MMM dd, HH:mm')}
+                          </Typography>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              p: 1.5,
+                              backgroundColor:
+                                message.sender === 'user'
+                                  ? alpha(theme.palette.primary.main, 0.1)
+                                  : message.sender === 'admin'
+                                  ? alpha(theme.palette.secondary.main, 0.1)
+                                  : alpha(theme.palette.grey[500], 0.1),
+                              borderRadius: 2,
+                            }}
+                          >
+                            <Typography variant="body2">{message.text}</Typography>
+                          </Paper>
+                        </Stack>
+                        {message.sender === 'user' && (
+                          <Avatar
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              bgcolor: theme.palette.info.main,
+                            }}
+                          >
                             <User size={16} />
-                          )}
-                        </Avatar>
-                      )}
-                      <Stack spacing={0.5} sx={{ maxWidth: '70%' }}>
-                        <Typography variant="caption" color="text.secondary">
-                          {message.senderName} •{' '}
-                          {format(new Date(message.timestamp), 'MMM dd, HH:mm')}
-                        </Typography>
-                        <Paper
-                          elevation={0}
-                          sx={{
-                            p: 1.5,
-                            backgroundColor:
-                              message.sender === 'user'
-                                ? alpha(theme.palette.primary.main, 0.1)
-                                : message.sender === 'admin'
-                                ? alpha(theme.palette.secondary.main, 0.1)
-                                : alpha(theme.palette.grey[500], 0.1),
-                            borderRadius: 2,
-                          }}
-                        >
-                          <Typography variant="body2">{message.text}</Typography>
-                        </Paper>
+                          </Avatar>
+                        )}
                       </Stack>
-                      {message.sender === 'user' && (
-                        <Avatar
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor: theme.palette.info.main,
-                          }}
-                        >
-                          <User size={16} />
-                        </Avatar>
-                      )}
-                    </Stack>
-                  ))}
+                    ))}
+                  </Stack>
+
+                  {/* Feedback Section */}
+                  {selectedTicket.feedback && selectedTicket.feedback.length > 0 && (
+                    <>
+                      <Divider />
+                      <Stack spacing={2}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Star size={20} color={theme.palette.warning.main} />
+                          <Typography variant="subtitle2" fontWeight={600}>
+                            Customer Feedback
+                          </Typography>
+                        </Stack>
+                        {selectedTicket.feedback.map((feedback) => (
+                          <FeedbackCard key={feedback.id} feedback={feedback} />
+                        ))}
+                      </Stack>
+                    </>
+                  )}
                 </Stack>
               </Box>
             </DialogContent>
