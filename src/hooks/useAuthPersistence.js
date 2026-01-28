@@ -1,31 +1,35 @@
 import { useEffect } from 'react';
 import { useAppDispatch } from '../store/hooks';
-import { setCredentials, setLoading } from '../store/slices/authSlice';
+import { setCredentials, setLoading, logout } from '../store/slices/authSlice';
+import { subscribeToAuthState } from '../services/firebaseAuthService';
 
 export const useAuthPersistence = () => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    const initAuth = () => {
-      dispatch(setLoading(true));
-      
-      try {
-        const token = localStorage.getItem('token');
-        const userStr = localStorage.getItem('user');
+    dispatch(setLoading(true));
 
-        if (token && userStr) {
-          const user = JSON.parse(userStr);
-          dispatch(setCredentials({ user, token }));
-        }
-      } catch (error) {
-        console.error('Failed to restore auth state:', error);
+    // Subscribe to Firebase auth state changes
+    const unsubscribe = subscribeToAuthState((user) => {
+      if (user) {
+        // User is signed in
+        const token = user.uid;
+        dispatch(setCredentials({ user, token }));
+        
+        // Persist to localStorage
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+      } else {
+        // User is signed out
+        dispatch(logout());
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-      } finally {
-        dispatch(setLoading(false));
       }
-    };
+      
+      dispatch(setLoading(false));
+    });
 
-    initAuth();
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, [dispatch]);
 };

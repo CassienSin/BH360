@@ -11,23 +11,19 @@ import {
   Checkbox,
   FormControlLabel,
   Alert,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Box,
-  alpha,
 } from '@mui/material';
-import { Eye, EyeOff, Mail, Lock, Shield, User, UserCheck } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { useAppDispatch } from '../../store/hooks';
 import { setCredentials } from '../../store/slices/authSlice';
+import { signIn } from '../../services/firebaseAuthService';
 
 const Login = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('resident');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
@@ -39,42 +35,46 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Sign in with Firebase
+      const userData = await signIn(email, password);
+      
+      // Get token from Firebase
+      const token = userData.uid; // Using uid as token for now
+      
+      // Store credentials in Redux
+      dispatch(setCredentials({ 
+        user: userData, 
+        token 
+      }));
 
-      // Mock user data with selected role
-      const mockUser = {
-        id: '1',
-        email,
-        firstName: 'Mr.Meow',
-        lastName: 'Park',
-        role,
-        verified: true,
-      };
+      // Store in localStorage for persistence
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
 
-      const mockToken = 'mock-jwt-token';
-
-      dispatch(setCredentials({ user: mockUser, token: mockToken }));
-      localStorage.setItem('token', mockToken);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-
+      toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (err) {
-      setError('Invalid email or password');
+      console.error('Login error:', err);
+      
+      // Handle specific Firebase errors
+      let errorMessage = 'Invalid email or password';
+      
+      if (err.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email';
+      } else if (err.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later';
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection';
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getRoleIcon = (roleValue) => {
-    switch (roleValue) {
-      case 'admin':
-        return <Shield size={20} />;
-      case 'tanod':
-        return <UserCheck size={20} />;
-      default:
-        return <User size={20} />;
     }
   };
 
@@ -95,39 +95,6 @@ const Login = () => {
             {error}
           </Alert>
         )}
-
-        <FormControl fullWidth>
-          <InputLabel>Select Role (Demo)</InputLabel>
-          <Select
-            value={role}
-            label="Select Role (Demo)"
-            onChange={(e) => setRole(e.target.value)}
-            startAdornment={
-              <InputAdornment position="start">
-                {getRoleIcon(role)}
-              </InputAdornment>
-            }
-          >
-            <MenuItem value="resident">
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <User size={18} />
-                <Typography>Resident</Typography>
-              </Box>
-            </MenuItem>
-            <MenuItem value="admin">
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Shield size={18} />
-                <Typography>Admin</Typography>
-              </Box>
-            </MenuItem>
-            <MenuItem value="tanod">
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <UserCheck size={18} />
-                <Typography>Tanod</Typography>
-              </Box>
-            </MenuItem>
-          </Select>
-        </FormControl>
 
         <TextField
           label="Email Address"

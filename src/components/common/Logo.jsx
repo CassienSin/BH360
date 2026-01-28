@@ -1,45 +1,73 @@
+import React from 'react';
 import { Box, Stack, Typography } from '@mui/material';
-import NetworkIcon from './NetworkIcon';
 
-const Logo = ({ size = 'medium', showText = true, variant = 'default' }) => {
+// 1. The Default Fallback Icon (The original "B")
+const DefaultIcon = ({ size, color, opacity = 1 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ display: 'block' }}
+  >
+    <path
+      d="M6 5C6 3.89543 6.89543 3 8 3H12C14.7614 3 17 5.23858 17 8C17 10.7614 14.7614 13 12 13H8V9H12C12.5523 9 13 8.55228 13 8C13 7.44772 12.5523 7 12 7H9C8.44772 7 8 7.44772 8 8V13H6V5Z"
+      fill={color}
+      fillOpacity={opacity}
+    />
+    <path
+      d="M6 15V20C6 21.1046 6.89543 22 8 22H13C16.3137 22 19 19.3137 19 16C19 12.6863 16.3137 10 13 10H8V15H6ZM8 15H13C13.5523 15 14 15.4477 14 16C14 16.5523 13.5523 17 13 17H9C8.44772 17 8 16.5523 8 16V15Z"
+      fill={color}
+      fillOpacity={opacity}
+    />
+  </svg>
+);
+
+const Logo = ({ 
+  size = 'medium', 
+  showText = true, 
+  variant = 'default',
+  // New Prop: Image Source (URL or import)
+  src = "", 
+  // New Prop: Custom Text
+  text = { title: 'BH360', subtitle: 'BMS' } 
+}) => {
+  
   const dimensions = {
-    small: { container: 36, icon: 18, text: 'h6' },
-    medium: { container: 48, icon: 26, text: 'h5' },
-    large: { container: 64, icon: 34, text: 'h4' },
+    small: { container: 36, icon: 20, text: 'h6', subtext: '0.65rem' },
+    medium: { container: 48, icon: 28, text: 'h5', subtext: '0.75rem' },
+    large: { container: 64, icon: 38, text: 'h4', subtext: '0.85rem' },
   };
 
   const config = dimensions[size];
-  
-  // Color schemes based on variant
+
+  // Color schemes
   const colorScheme = {
     default: {
-      background: 'linear-gradient(135deg, #3457D5 0%, #5B8DEE 50%, #7BA4F5 100%)',
-      textGradient: 'linear-gradient(135deg, #3457D5 0%, #5B8DEE 100%)',
-      iconColor: '#FFFFFF',
-      shadow: '0 8px 24px rgba(52, 87, 213, 0.35), 0 2px 8px rgba(52, 87, 213, 0.2)',
-      hoverShadow: '0 12px 32px rgba(52, 87, 213, 0.4), 0 4px 12px rgba(52, 87, 213, 0.25)',
+      background: '#FFFFFF',
+      textGradient: 'linear-gradient(135deg, #FFFFFF 0%, #FFFFFF 100%)',
+      iconColor: '#4F46E5',
+      shadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05)',
+      hoverShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
+      ringColor: 'rgba(79, 70, 229, 0.1)',
     },
     light: {
-      background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
-      textGradient: 'linear-gradient(135deg, #1E293B 0%, #334155 100%)',
-      iconColor: '#3457D5',
-      shadow: '0 4px 20px rgba(52, 87, 213, 0.15), inset 0 1px 2px rgba(255,255,255,0.8)',
-      hoverShadow: '0 6px 24px rgba(52, 87, 213, 0.2), inset 0 1px 2px rgba(255,255,255,0.8)',
+      background: '#FFFFFF',
+      textGradient: 'linear-gradient(135deg, #4F46E5 0%, #4F46E5 100%)',
+      iconColor: '#4F46E5',
+      shadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05)',
+      hoverShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
+      ringColor: 'rgba(79, 70, 229, 0.1)',
     },
-    green: {
-      background: 'linear-gradient(135deg, #10B981 0%, #34D399 50%, #6EE7B7 100%)',
-      textGradient: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
-      iconColor: '#FFFFFF',
-      shadow: '0 8px 24px rgba(16, 185, 129, 0.35), 0 2px 8px rgba(16, 185, 129, 0.2)',
-      hoverShadow: '0 12px 32px rgba(16, 185, 129, 0.4), 0 4px 12px rgba(16, 185, 129, 0.25)',
-    },
+
   };
-  
+
   const colors = colorScheme[variant];
 
   return (
-    <Stack direction="row" spacing={showText ? 2 : 0} alignItems="center">
-      {/* Logo Icon - Network/Hub Structure */}
+    <Stack direction="row" spacing={showText ? 1.5 : 0} alignItems="center">
+      {/* Logo Icon Container */}
       <Box
         sx={{
           position: 'relative',
@@ -48,61 +76,92 @@ const Logo = ({ size = 'medium', showText = true, variant = 'default' }) => {
           justifyContent: 'center',
           width: config.container,
           height: config.container,
-          borderRadius: '14px',
+          borderRadius: '16px',
           background: colors.background,
           boxShadow: colors.shadow,
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          cursor: 'pointer',
+          border: variant === 'light' ? '1px solid #E2E8F0' : 'none',
+          overflow: 'hidden', // Ensures generic images stay inside rounded corners
+          
           '&:hover': {
-            transform: 'translateY(-2px)',
+            transform: 'translateY(-2px) scale(1.02)',
             boxShadow: colors.hoverShadow,
+            '& .logo-shine': {
+              transform: 'translateX(100%)',
+            }
           },
+          
+          // Inner Ring for detail
           '&::before': {
             content: '""',
             position: 'absolute',
-            inset: 0,
-            borderRadius: '14px',
-            padding: '2px',
-            background:
-              variant === 'light'
-                ? 'linear-gradient(135deg, #3457D5 0%, #5B8DEE 100%)'
-                : variant === 'green'
-                ? 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 100%)'
-                : 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 100%)',
-            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-            WebkitMaskComposite: 'xor',
-            maskComposite: 'exclude',
-            opacity: variant === 'light' ? 0.3 : 1,
-          },
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            top: '4px',
-            left: '6px',
-            right: '6px',
-            height: '35%',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 100%)',
-            borderRadius: '10px 10px 50% 50%',
-            opacity: variant === 'light' ? 0.6 : 1,
+            inset: '3px',
+            borderRadius: '13px',
+            border: `1.5px solid ${colors.ringColor}`,
+            opacity: 0.8,
+            zIndex: 2, // Ensure ring sits on top of images
+            pointerEvents: 'none',
           },
         }}
       >
-        {/* Network Icon */}
+        {/* Shine Animation Effect */}
         <Box
+          className="logo-shine"
           sx={{
-            position: 'relative',
-            zIndex: 1,
-            display: 'flex',
-            alignItems: 'center',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.4) 40%, transparent 60%)',
+            transform: 'translateX(-100%)',
+            transition: 'transform 0.6s',
+            zIndex: 3,
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* LOGO CONTENT LOGIC */}
+        <Box 
+          sx={{ 
+            zIndex: 1, 
+            width: '100%', 
+            height: '100%', 
+            display: 'flex', 
+            alignItems: 'center', 
             justifyContent: 'center',
+            filter: src ? 'none' : 'drop-shadow(0px 2px 4px rgba(0,0,0,0.1))' 
           }}
         >
-          <NetworkIcon size={config.icon} color={colors.iconColor} variant={variant === 'light' ? 'primary' : 'white'} />
+          {src ? (
+            // 1. If SRC provided, render Image
+            <Box
+                component="img"
+                src={src}
+                alt="Logo"
+                sx={{
+                    width: '65%', // Leaves some padding around the image
+                    height: '65%',
+                    objectFit: 'contain',
+                    // Optional: If you want to force white icons on dark backgrounds
+                    // filter: variant !== 'light' ? 'brightness(0) invert(1)' : 'none' 
+                }}
+            />
+          ) : (
+            // 2. If NO SRC, render Default Vector B
+            <DefaultIcon 
+              size={config.icon} 
+              color={colors.iconColor} 
+              opacity={variant === 'light' ? 1 : 0.95} 
+            />
+          )}
         </Box>
       </Box>
 
-      {/* Text */}
+      {/* Text Group */}
       {showText && (
-        <Stack spacing={0}>
+        <Stack spacing={-0.25} sx={{ userSelect: 'none' }}>
           <Typography
             variant={config.text}
             sx={{
@@ -111,25 +170,24 @@ const Logo = ({ size = 'medium', showText = true, variant = 'default' }) => {
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
-              letterSpacing: '-0.04em',
-              lineHeight: 1.2,
-              fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              letterSpacing: '-0.03em',
+              fontFamily: '"Inter", sans-serif',
+              lineHeight: 1.1,
             }}
           >
-            BH360
+            {text.title}
           </Typography>
           <Typography
-            variant="caption"
             sx={{
-              color: variant === 'light' ? 'rgba(30, 41, 59, 0.7)' : variant === 'green' ? 'rgba(5, 150, 105, 0.9)' : 'text.secondary',
-              fontSize: size === 'small' ? '0.65rem' : size === 'medium' ? '0.75rem' : '0.85rem',
+              color: variant === 'light' ? '#4F46E5' : variant === 'green' ? '#10B981' : '#FFFFFF',
+              fontSize: config.subtext,
               fontWeight: 600,
-              letterSpacing: '0.03em',
+              letterSpacing: '0.05em',
               textTransform: 'uppercase',
-              lineHeight: 1,
+              opacity: 0.9,
             }}
           >
-            Barangay Management System
+            {text.subtitle}
           </Typography>
         </Stack>
       )}

@@ -64,7 +64,7 @@ const Sidebar = ({ onClose }) => {
     >
       {/* Logo Section */}
       <Box sx={{ px: 3, mb: 3 }}>
-        <Logo size="medium" showText={true} variant="green" />
+        <Logo size="medium" showText={true} variant="light" />
       </Box>
 
       <Divider sx={{ mb: 2 }} />

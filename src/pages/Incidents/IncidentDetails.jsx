@@ -154,7 +154,6 @@ const IncidentDetails = () => {
   };
 
   const handleStatusUpdate = (updateData) => {
-    console.log('Status update:', updateData);
     // Here you would dispatch to Redux or call an API
   };
 

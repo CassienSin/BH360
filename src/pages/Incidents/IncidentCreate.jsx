@@ -92,10 +92,9 @@ const IncidentCreate = () => {
       aiClassification,
       aiPriority,
       aiSuggestions,
-      createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString()
     };
     
-    console.log('Submitting with AI insights:', submissionData);
     toast.success('Incident reported successfully with AI analysis!');
     navigate('/incidents');
   };

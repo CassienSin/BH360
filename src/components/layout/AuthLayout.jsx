@@ -23,7 +23,7 @@ const AuthLayout = () => {
               mb: 2,
             }}
           >
-            <Logo size="large" showText={true} variant="light" />
+            <Logo size="large" showText={true} variant="default" />
           </Box>
 
           {/* Auth Form */}

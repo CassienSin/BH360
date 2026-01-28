@@ -22,8 +22,10 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { logout } from '../../store/slices/authSlice';
+import { logout as logoutAction } from '../../store/slices/authSlice';
+import { logout as firebaseLogout } from '../../services/firebaseAuthService';
 import RoleSwitcher from './RoleSwitcher';
 import NotificationCenter from '../notifications/NotificationCenter';
 
@@ -53,11 +55,24 @@ const Header = ({ onMenuClick }) => {
     setAnchorElNotifications(null);
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      // Sign out from Firebase
+      await firebaseLogout();
+      
+      // Clear Redux state
+      dispatch(logoutAction());
+      
+      // Clear localStorage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Failed to logout. Please try again.');
+    }
   };
 
   return (

@@ -12,6 +12,8 @@ import {
   Alert,
 } from '@mui/material';
 import { Eye, EyeOff, Mail, Lock, User, Phone, MapPin } from 'lucide-react';
+import { toast } from 'react-toastify';
+import { register } from '../../services/firebaseAuthService';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -39,16 +41,48 @@ const Register = () => {
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      toast.error('Password must be at least 6 characters long');
       return;
     }
 
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Register with Firebase
+      const userData = await register(formData.email, formData.password, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        fullName: `${formData.firstName} ${formData.lastName}`,
+        phone: formData.phone,
+        address: formData.address,
+        role: 'resident', // Default role for new registrations
+      });
+
+      toast.success('Account created successfully! Please check your email for verification.');
       navigate('/login');
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      console.error('Registration error:', err);
+      
+      // Handle specific Firebase errors
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Please use a stronger password';
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection';
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
