@@ -1,267 +1,186 @@
 import { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { Stack, Typography, Card, CardContent, Grid, Box, useTheme, Chip, alpha } from '@mui/material';
+import { Stack, Typography, Card, CardContent, Grid, Box, useTheme, Chip, alpha, CircularProgress, Alert } from '@mui/material';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Brain, Sparkles } from 'lucide-react';
 import { analyzeTrends } from '../../services/aiService';
 import AIInsightsPanel from '../../components/ai/AIInsightsPanel';
 import TrendAnalysisCharts from '../../components/ai/TrendAnalysisCharts';
-
-// Mock incidents data for trend analysis
-const mockIncidentsForAnalysis = [
-  {
-    id: '1',
-    title: 'Loud music disturbance',
-    description: 'Neighbors playing loud music late at night',
-    category: 'noise',
-    priority: 'minor',
-    location: 'Purok 3, Barangay Hall Area',
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: '2',
-    title: 'Broken streetlight',
-    description: 'Streetlight not working for 3 days',
-    category: 'hazard',
-    priority: 'medium',
-    location: 'Main Road, Block 5',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: '3',
-    title: 'Suspicious person',
-    description: 'Unknown person lurking around',
-    category: 'crime',
-    priority: 'high',
-    location: 'Purok 3, Barangay Hall Area',
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-  },
-  {
-    id: '4',
-    title: 'Property dispute',
-    description: 'Neighbors arguing over fence',
-    category: 'dispute',
-    priority: 'minor',
-    location: 'Residential Area, Block 2',
-    createdAt: new Date(Date.now() - 259200000).toISOString(),
-  },
-  {
-    id: '5',
-    title: 'Street fight',
-    description: 'Physical altercation between residents',
-    category: 'crime',
-    priority: 'emergency',
-    location: 'Purok 3, Barangay Hall Area',
-    createdAt: new Date(Date.now() - 345600000).toISOString(),
-  },
-  {
-    id: '6',
-    title: 'Fallen tree blocking road',
-    description: 'Large tree fell during storm',
-    category: 'hazard',
-    priority: 'urgent',
-    location: 'Main Road, Block 5',
-    createdAt: new Date(Date.now() - 432000000).toISOString(),
-  },
-  {
-    id: '7',
-    title: 'Noise complaint',
-    description: 'Construction noise early morning',
-    category: 'noise',
-    priority: 'minor',
-    location: 'Residential Area, Block 2',
-    createdAt: new Date(Date.now() - 518400000).toISOString(),
-  },
-  {
-    id: '8',
-    title: 'Theft reported',
-    description: 'Motorcycle stolen from parking',
-    category: 'crime',
-    priority: 'urgent',
-    location: 'Purok 3, Barangay Hall Area',
-    createdAt: new Date(Date.now() - 604800000).toISOString(),
-  },
-];
+import { useAllIncidents } from '../../hooks/useIncidents';
 
 const Analytics = () => {
   const theme = useTheme();
-  const { incidents } = useSelector((state) => state.incident);
+  const { data: incidents = [], isLoading, error } = useAllIncidents();
   const [trendData, setTrendData] = useState(null);
 
-  // Use actual incidents if available, otherwise use mock data
-  const incidentsData = incidents.length > 0 ? incidents : mockIncidentsForAnalysis;
-
   useEffect(() => {
-    // Analyze trends using AI
-    const analysis = analyzeTrends(incidentsData);
-    setTrendData(analysis);
-  }, [incidentsData]);
+    if (incidents.length > 0) {
+      // Analyze trends using AI
+      const analysis = analyzeTrends(incidents);
+      setTrendData(analysis);
+    }
+  }, [incidents]);
 
-  const incidentData = [
-    { name: 'Crime', value: 45, color: theme.palette.error.main },
-    { name: 'Noise', value: 32, color: theme.palette.warning.main },
-    { name: 'Disputes', value: 28, color: theme.palette.info.main },
-    { name: 'Hazards', value: 18, color: theme.palette.success.main },
+  // Process incident data for visualization
+  const processIncidentData = () => {
+    if (incidents.length === 0) return [];
+
+    const categoryCounts = {};
+    incidents.forEach(incident => {
+      const category = incident.category || 'other';
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    });
+
+    return Object.entries(categoryCounts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value
+    }));
+  };
+
+  const incidentData = processIncidentData();
+
+  const COLORS = [
+    theme.palette.primary.main,
+    theme.palette.secondary.main,
+    theme.palette.success.main,
+    theme.palette.warning.main,
+    theme.palette.error.main,
+    theme.palette.info.main,
   ];
 
-  const monthlyData = [
-    { month: 'Jan', total: 42 },
-    { month: 'Feb', total: 38 },
-    { month: 'Mar', total: 45 },
-    { month: 'Apr', total: 52 },
-    { month: 'May', total: 48 },
-    { month: 'Jun', total: 55 },
+  // Priority distribution
+  const priorityData = [
+    { name: 'Minor', value: incidents.filter(i => i.priority === 'minor').length },
+    { name: 'Urgent', value: incidents.filter(i => i.priority === 'urgent').length },
+    { name: 'Emergency', value: incidents.filter(i => i.priority === 'emergency').length },
   ];
+
+  // Location hotspots (top 5)
+  const locationCounts = {};
+  incidents.forEach(incident => {
+    const location = incident.location || 'Unknown';
+    locationCounts[location] = (locationCounts[location] || 0) + 1;
+  });
+
+  const locationData = Object.entries(locationCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([name, value]) => ({ name, value }));
+
+  // Error state
+  if (error) {
+    return (
+      <Stack spacing={3} className="animate-fade-in">
+        <Alert severity="error">
+          Failed to load analytics data. Please check your Firebase connection.
+        </Alert>
+      </Stack>
+    );
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Stack spacing={3} className="animate-fade-in">
+        <Typography variant="h4" fontWeight={700} className="gradient-text">
+          Analytics & Insights
+        </Typography>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
+        </Box>
+      </Stack>
+    );
+  }
+
+  // No data state
+  if (incidents.length === 0) {
+    return (
+      <Stack spacing={3} className="animate-fade-in">
+        <Stack spacing={1}>
+          <Typography variant="h4" fontWeight={700} className="gradient-text">
+            Analytics & Insights
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            AI-powered analysis of incident patterns and trends
+          </Typography>
+        </Stack>
+        <Card
+          elevation={0}
+          sx={{
+            borderRadius: 3,
+            border: `1px solid ${theme.palette.divider}`,
+            p: 6,
+            textAlign: 'center',
+          }}
+        >
+          <Box sx={{ mb: 2 }}>
+            <Brain size={64} color={theme.palette.text.secondary} />
+          </Box>
+          <Typography variant="h6" gutterBottom>
+            No Data Available
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Analytics will appear once incidents are reported in the system
+          </Typography>
+        </Card>
+      </Stack>
+    );
+  }
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} className="animate-fade-in">
       <Stack spacing={1}>
-        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-          <Typography variant="h4" fontWeight={700}>
-            Analytics & Reports
-          </Typography>
-          <Chip
-            icon={<Brain size={16} />}
-            label="AI-Powered"
-            sx={{
-              backgroundColor: alpha(theme.palette.primary.main, 0.1),
-              color: theme.palette.primary.main,
-              fontWeight: 700,
-            }}
-          />
-        </Stack>
+        <Typography variant="h4" fontWeight={700} className="gradient-text">
+          Analytics & Insights
+        </Typography>
         <Typography variant="body2" color="text.secondary">
-          Comprehensive insights and statistics with AI-powered trend analysis
+          AI-powered analysis of incident patterns and trends
         </Typography>
       </Stack>
 
       {/* AI Insights Panel */}
-      {trendData && trendData.insights && trendData.insights.length > 0 && (
-        <AIInsightsPanel insights={trendData.insights} />
-      )}
-
-      {/* Summary Stats */}
       {trendData && (
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card
-              elevation={0}
-              sx={{
-                borderRadius: 3,
-                border: `1px solid ${theme.palette.divider}`,
-                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-              }}
-            >
-              <CardContent>
-                <Typography variant="body2" color="text.secondary" mb={1}>
-                  Total Incidents
+        <Card
+          elevation={0}
+          sx={{
+            borderRadius: 3,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(
+              theme.palette.secondary.main,
+              0.05
+            )} 100%)`,
+          }}
+        >
+          <CardContent>
+            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                  display: 'inline-flex',
+                }}
+              >
+                <Brain size={24} color={theme.palette.primary.main} />
+              </Box>
+              <Stack>
+                <Typography variant="h6" fontWeight={700}>
+                  AI-Generated Insights
                 </Typography>
-                <Typography variant="h3" fontWeight={700} color="primary.main">
-                  {trendData.totalIncidents}
+                <Typography variant="body2" color="text.secondary">
+                  Analyzing {incidents.length} incidents
                 </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {trendData.categoryTrends && trendData.categoryTrends.length > 0 && (
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <Card
-                elevation={0}
-                sx={{
-                  borderRadius: 3,
-                  border: `1px solid ${theme.palette.divider}`,
-                  background: `linear-gradient(135deg, ${alpha(theme.palette.error.main, 0.1)} 0%, ${alpha(theme.palette.error.main, 0.05)} 100%)`,
-                }}
-              >
-                <CardContent>
-                  <Typography variant="body2" color="text.secondary" mb={1}>
-                    Top Category
-                  </Typography>
-                  <Typography variant="h3" fontWeight={700} color="error.main" textTransform="capitalize">
-                    {trendData.categoryTrends[0].category}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {trendData.categoryTrends[0].percentage}% of total
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-
-          {trendData.frequentAreas && trendData.frequentAreas.length > 0 && (
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <Card
-                elevation={0}
-                sx={{
-                  borderRadius: 3,
-                  border: `1px solid ${theme.palette.divider}`,
-                  background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.1)} 0%, ${alpha(theme.palette.warning.main, 0.05)} 100%)`,
-                }}
-              >
-                <CardContent>
-                  <Typography variant="body2" color="text.secondary" mb={1}>
-                    Hotspot Area
-                  </Typography>
-                  <Typography variant="h6" fontWeight={700} color="warning.main" noWrap>
-                    {trendData.frequentAreas[0].area}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {trendData.frequentAreas[0].count} incidents
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-
-          {trendData.timePatterns && trendData.timePatterns.length > 0 && (
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <Card
-                elevation={0}
-                sx={{
-                  borderRadius: 3,
-                  border: `1px solid ${theme.palette.divider}`,
-                  background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.1)} 0%, ${alpha(theme.palette.info.main, 0.05)} 100%)`,
-                }}
-              >
-                <CardContent>
-                  <Typography variant="body2" color="text.secondary" mb={1}>
-                    Peak Hour
-                  </Typography>
-                  <Typography variant="h3" fontWeight={700} color="info.main">
-                    {trendData.timePatterns[0].hour}:00
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {trendData.timePatterns[0].count} incidents
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-        </Grid>
+              </Stack>
+            </Stack>
+            <AIInsightsPanel trendData={trendData} />
+          </CardContent>
+        </Card>
       )}
 
-      {/* AI Trend Analysis Charts */}
-      {trendData && <TrendAnalysisCharts trendData={trendData} />}
-
-      {/* Original Charts */}
-      <Stack spacing={1}>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Sparkles size={20} color={theme.palette.primary.main} />
-          <Typography variant="h5" fontWeight={600}>
-            Historical Data
-          </Typography>
-        </Stack>
-      </Stack>
-
+      {/* Charts Grid */}
       <Grid container spacing={3}>
+        {/* Incident by Category */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card
-            elevation={0}
-            sx={{
-              borderRadius: 3,
-              border: `1px solid ${theme.palette.divider}`,
-            }}
-          >
+          <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
             <CardContent>
               <Typography variant="h6" fontWeight={600} mb={2}>
                 Incidents by Category
@@ -273,43 +192,182 @@ const Analytics = () => {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    outerRadius={100}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
-                    label={(entry) => entry.name}
                   >
                     {incidentData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
+              <Stack direction="row" flexWrap="wrap" gap={1} mt={2} justifyContent="center">
+                {incidentData.map((entry, index) => (
+                  <Chip
+                    key={entry.name}
+                    label={`${entry.name}: ${entry.value}`}
+                    size="small"
+                    sx={{
+                      backgroundColor: alpha(COLORS[index % COLORS.length], 0.1),
+                      color: COLORS[index % COLORS.length],
+                      fontWeight: 600,
+                    }}
+                  />
+                ))}
+              </Stack>
             </CardContent>
           </Card>
         </Grid>
 
+        {/* Priority Distribution */}
         <Grid size={{ xs: 12, md: 6 }}>
+          <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600} mb={2}>
+                Priority Distribution
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={priorityData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                  <XAxis dataKey="name" stroke={theme.palette.text.secondary} />
+                  <YAxis stroke={theme.palette.text.secondary} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill={theme.palette.primary.main} radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Location Hotspots */}
+        <Grid size={{ xs: 12 }}>
+          <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600} mb={2}>
+                Top 5 Location Hotspots
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={locationData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                  <XAxis type="number" stroke={theme.palette.text.secondary} />
+                  <YAxis type="category" dataKey="name" stroke={theme.palette.text.secondary} width={150} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill={theme.palette.secondary.main} radius={[0, 8, 8, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Trend Analysis Charts */}
+      {trendData && (
+        <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+          <CardContent>
+            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+              <Sparkles size={24} color={theme.palette.secondary.main} />
+              <Typography variant="h6" fontWeight={600}>
+                Trend Analysis
+              </Typography>
+            </Stack>
+            <TrendAnalysisCharts trendData={trendData} incidents={incidents} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Statistics Summary */}
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
             elevation={0}
             sx={{
               borderRadius: 3,
               border: `1px solid ${theme.palette.divider}`,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(
+                theme.palette.primary.main,
+                0.05
+              )} 100%)`,
             }}
           >
             <CardContent>
-              <Typography variant="h6" fontWeight={600} mb={2}>
-                Monthly Incident Trend
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Total Incidents
               </Typography>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                  <XAxis dataKey="month" stroke={theme.palette.text.secondary} />
-                  <YAxis stroke={theme.palette.text.secondary} />
-                  <Tooltip />
-                  <Bar dataKey="total" fill={theme.palette.primary.main} radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <Typography variant="h3" fontWeight={700} color="primary.main">
+                {incidents.length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card
+            elevation={0}
+            sx={{
+              borderRadius: 3,
+              border: `1px solid ${theme.palette.divider}`,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(
+                theme.palette.success.main,
+                0.05
+              )} 100%)`,
+            }}
+          >
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Resolved
+              </Typography>
+              <Typography variant="h3" fontWeight={700} color="success.main">
+                {incidents.filter((i) => i.status === 'resolved').length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card
+            elevation={0}
+            sx={{
+              borderRadius: 3,
+              border: `1px solid ${theme.palette.divider}`,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.1)} 0%, ${alpha(
+                theme.palette.warning.main,
+                0.05
+              )} 100%)`,
+            }}
+          >
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                In Progress
+              </Typography>
+              <Typography variant="h3" fontWeight={700} color="warning.main">
+                {incidents.filter((i) => i.status === 'in-progress').length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card
+            elevation={0}
+            sx={{
+              borderRadius: 3,
+              border: `1px solid ${theme.palette.divider}`,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.1)} 0%, ${alpha(
+                theme.palette.info.main,
+                0.05
+              )} 100%)`,
+            }}
+          >
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Pending
+              </Typography>
+              <Typography variant="h3" fontWeight={700} color="info.main">
+                {incidents.filter((i) => i.status === 'submitted').length}
+              </Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -319,4 +377,3 @@ const Analytics = () => {
 };
 
 export default Analytics;
-
