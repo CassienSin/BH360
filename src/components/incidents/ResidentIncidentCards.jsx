@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Stack,
@@ -13,48 +13,27 @@ import {
   Box,
   alpha,
   useTheme,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import { Plus, Search, MapPin, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
-
-// Mock data filtered for current user with AI analysis
-const mockIncidents = [
-  {
-    id: '1',
-    title: 'Loud music disturbance',
-    category: 'noise',
-    priority: 'urgent',
-    status: 'in-progress',
-    location: 'Purok 3, Barangay Hall Area',
-    createdAt: new Date().toISOString(),
-    aiAnalysis: { score: 68, confidence: 92 },
-  },
-  {
-    id: '2',
-    title: 'Broken streetlight near my house',
-    category: 'hazard',
-    priority: 'urgent',
-    status: 'submitted',
-    location: 'Main Road, Block 5',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    aiAnalysis: { score: 55, confidence: 88 },
-  },
-  {
-    id: '6',
-    title: 'Stray dogs in the neighborhood',
-    category: 'hazard',
-    priority: 'minor',
-    status: 'resolved',
-    location: 'Residential Area, Block 8',
-    createdAt: new Date(Date.now() - 432000000).toISOString(),
-    aiAnalysis: { score: 35, confidence: 82 },
-  },
-];
+import { useAllIncidents } from '../../hooks/useIncidents';
+import { useAppSelector } from '../../store/hooks';
 
 const ResidentIncidentCards = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useAppSelector((state) => state.auth);
+  
+  // Fetch incidents from Firebase
+  const { data: allIncidents = [], isLoading, error } = useAllIncidents();
+  
+  // Filter incidents for current user
+  const myIncidents = useMemo(() => {
+    return allIncidents.filter(incident => incident.userId === user?.uid);
+  }, [allIncidents, user?.uid]);
 
   const getCategoryColor = (category) => {
     const colors = {
@@ -66,9 +45,31 @@ const ResidentIncidentCards = () => {
     return colors[category] || theme.palette.grey[500];
   };
 
-  const filteredIncidents = mockIncidents.filter((incident) =>
-    incident.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredIncidents = useMemo(() => {
+    return myIncidents.filter((incident) =>
+      incident.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      incident.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      incident.location?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [myIncidents, searchQuery]);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Alert severity="error">
+        Failed to load incidents. Please check your Firebase connection.
+      </Alert>
+    );
+  }
 
   return (
     <Stack spacing={3}>
@@ -93,20 +94,20 @@ const ResidentIncidentCards = () => {
       {/* Summary Cards */}
       <Stack direction="row" spacing={2} flexWrap="wrap">
         {[
-          { label: 'My Reports', value: mockIncidents.length, color: theme.palette.primary.main },
+          { label: 'My Reports', value: myIncidents.length, color: theme.palette.primary.main },
           {
             label: 'Pending',
-            value: mockIncidents.filter((i) => i.status === 'submitted').length,
+            value: myIncidents.filter((i) => i.status === 'submitted').length,
             color: theme.palette.info.main,
           },
           {
             label: 'In Progress',
-            value: mockIncidents.filter((i) => i.status === 'in-progress').length,
+            value: myIncidents.filter((i) => i.status === 'in-progress').length,
             color: theme.palette.warning.main,
           },
           {
             label: 'Resolved',
-            value: mockIncidents.filter((i) => i.status === 'resolved').length,
+            value: myIncidents.filter((i) => i.status === 'resolved').length,
             color: theme.palette.success.main,
           },
         ].map((stat, index) => (
@@ -196,7 +197,15 @@ const ResidentIncidentCards = () => {
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Calendar size={16} color={theme.palette.text.secondary} />
                         <Typography variant="body2" color="text.secondary">
-                          {format(new Date(incident.createdAt), 'MMM dd, yyyy HH:mm')}
+                          {incident.createdAt 
+                            ? format(
+                                incident.createdAt?.toDate 
+                                  ? incident.createdAt.toDate() 
+                                  : new Date(incident.createdAt), 
+                                'MMM dd, yyyy HH:mm'
+                              )
+                            : 'Unknown date'
+                          }
                         </Typography>
                       </Stack>
                     </Stack>

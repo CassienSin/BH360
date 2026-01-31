@@ -19,6 +19,8 @@ import {
   Menu,
   ListItemIcon,
   ListItemText,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import {
@@ -35,85 +37,12 @@ import {
   Clock,
 } from 'lucide-react';
 import { format } from 'date-fns';
-
-// Mock data with AI analysis
-const mockIncidents = [
-  {
-    id: '1',
-    title: 'Loud music disturbance',
-    category: 'noise',
-    priority: 'urgent',
-    status: 'in-progress',
-    location: 'Purok 3, Barangay Hall Area',
-    reporterName: 'Juan Dela Cruz',
-    reporterContact: '0912-345-6789',
-    assignedTo: 'Tanod Pedro Santos',
-    createdAt: new Date().toISOString(),
-    lastUpdated: new Date().toISOString(),
-    resolvedAt: null,
-    aiAnalysis: { score: 68, category: 'noise', confidence: 92 },
-  },
-  {
-    id: '2',
-    title: 'Broken streetlight',
-    category: 'hazard',
-    priority: 'urgent',
-    status: 'submitted',
-    location: 'Main Road, Block 5',
-    reporterName: 'Maria Santos',
-    reporterContact: '0923-456-7890',
-    assignedTo: null,
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    lastUpdated: new Date(Date.now() - 86400000).toISOString(),
-    resolvedAt: null,
-    aiAnalysis: { score: 55, category: 'hazard', confidence: 88 },
-  },
-  {
-    id: '3',
-    title: 'Suspicious person',
-    category: 'crime',
-    priority: 'emergency',
-    status: 'resolved',
-    location: 'Corner of Main St & 2nd Ave',
-    reporterName: 'Pedro Reyes',
-    reporterContact: '0934-567-8901',
-    assignedTo: 'Tanod Jose Cruz',
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    lastUpdated: new Date(Date.now() - 86400000).toISOString(),
-    resolvedAt: new Date(Date.now() - 43200000).toISOString(),
-    aiAnalysis: { score: 85, category: 'crime', confidence: 95 },
-  },
-  {
-    id: '4',
-    title: 'Illegal parking blocking entrance',
-    category: 'dispute',
-    priority: 'urgent',
-    status: 'in-progress',
-    location: 'Residential Area, Block 12',
-    reporterName: 'Ana Garcia',
-    reporterContact: '0945-678-9012',
-    assignedTo: 'Tanod Pedro Santos',
-    createdAt: new Date(Date.now() - 259200000).toISOString(),
-    lastUpdated: new Date(Date.now() - 172800000).toISOString(),
-    resolvedAt: null,
-    aiAnalysis: { score: 45, category: 'dispute', confidence: 78 },
-  },
-  {
-    id: '5',
-    title: 'Garbage dumping in prohibited area',
-    category: 'hazard',
-    priority: 'emergency',
-    status: 'submitted',
-    location: 'Near River Bank',
-    reporterName: 'Carlos Fernandez',
-    reporterContact: '0956-789-0123',
-    assignedTo: null,
-    createdAt: new Date(Date.now() - 345600000).toISOString(),
-    lastUpdated: new Date(Date.now() - 345600000).toISOString(),
-    resolvedAt: null,
-    aiAnalysis: { score: 72, category: 'hazard', confidence: 91 },
-  },
-];
+import { 
+  useAllIncidents, 
+  useUpdateIncident, 
+  useDeleteIncident,
+  useResolveIncident,
+} from '../../hooks/useIncidents';
 
 const AdminIncidentTable = () => {
   const theme = useTheme();
@@ -125,6 +54,12 @@ const AdminIncidentTable = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
+  // Fetch incidents from Firebase
+  const { data: incidents = [], isLoading, error } = useAllIncidents();
+  const updateIncident = useUpdateIncident();
+  const deleteIncident = useDeleteIncident();
+  const resolveIncident = useResolveIncident();
+
   const handleMenuOpen = (event, row) => {
     setAnchorEl(event.currentTarget);
     setSelectedRow(row);
@@ -135,14 +70,40 @@ const AdminIncidentTable = () => {
     setSelectedRow(null);
   };
 
+  const handleResolveIncident = async () => {
+    if (selectedRow) {
+      try {
+        await resolveIncident.mutateAsync({ 
+          incidentId: selectedRow.id, 
+          resolution: { note: 'Marked as resolved from table' } 
+        });
+        handleMenuClose();
+      } catch (error) {
+        console.error('Failed to resolve incident:', error);
+      }
+    }
+  };
+
+  const handleDeleteIncident = async () => {
+    if (selectedRow && window.confirm('Are you sure you want to delete this incident?')) {
+      try {
+        await deleteIncident.mutateAsync(selectedRow.id);
+        handleMenuClose();
+      } catch (error) {
+        console.error('Failed to delete incident:', error);
+      }
+    }
+  };
+
   const getCategoryColor = (category) => {
     const colors = {
       crime: theme.palette.error.main,
       noise: theme.palette.warning.main,
       hazard: theme.palette.info.main,
       dispute: theme.palette.secondary.main,
+      other: theme.palette.grey[500],
     };
-    return colors[category] || theme.palette.grey[500];
+    return colors[category?.toLowerCase()] || theme.palette.grey[500];
   };
 
   const getPriorityColor = (priority) => {
@@ -152,7 +113,7 @@ const AdminIncidentTable = () => {
       minor: theme.palette.info.main,
       low: theme.palette.success.main,
     };
-    return colors[priority] || theme.palette.grey[500];
+    return colors[priority?.toLowerCase()] || theme.palette.grey[500];
   };
 
   const getStatusIcon = (status) => {
@@ -168,14 +129,20 @@ const AdminIncidentTable = () => {
     }
   };
 
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '-';
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    return format(date, 'MMM dd, yyyy');
+  };
+
   const columns = [
     {
       field: 'id',
       headerName: 'ID',
-      width: 80,
+      width: 100,
       renderCell: (params) => (
         <Typography variant="body2" fontWeight={600}>
-          #{params.value}
+          #{params.value.substring(0, 8)}
         </Typography>
       ),
     },
@@ -185,7 +152,7 @@ const AdminIncidentTable = () => {
       flex: 1,
       minWidth: 200,
       renderCell: (params) => (
-        <Tooltip title={params.value}>
+        <Tooltip title={params.value || 'No title'}>
           <Typography
             variant="body2"
             sx={{
@@ -195,7 +162,7 @@ const AdminIncidentTable = () => {
               fontWeight: 500,
             }}
           >
-            {params.value}
+            {params.value || params.row.description?.substring(0, 50) || 'Untitled'}
           </Typography>
         </Tooltip>
       ),
@@ -206,7 +173,7 @@ const AdminIncidentTable = () => {
       width: 120,
       renderCell: (params) => (
         <Chip
-          label={params.value}
+          label={params.value || 'other'}
           size="small"
           sx={{
             backgroundColor: alpha(getCategoryColor(params.value), 0.1),
@@ -224,7 +191,7 @@ const AdminIncidentTable = () => {
       width: 110,
       renderCell: (params) => (
         <Chip
-          label={params.value}
+          label={params.value || 'medium'}
           size="small"
           sx={{
             backgroundColor: alpha(getPriorityColor(params.value), 0.1),
@@ -243,7 +210,7 @@ const AdminIncidentTable = () => {
       renderCell: (params) => (
         <Chip
           icon={getStatusIcon(params.value)}
-          label={params.value.replace('-', ' ')}
+          label={(params.value || 'submitted').replace('-', ' ')}
           size="small"
           sx={{
             backgroundColor:
@@ -270,7 +237,7 @@ const AdminIncidentTable = () => {
       headerName: 'Reporter',
       width: 140,
       renderCell: (params) => (
-        <Typography variant="body2">{params.value}</Typography>
+        <Typography variant="body2">{params.value || 'Anonymous'}</Typography>
       ),
     },
     {
@@ -289,7 +256,7 @@ const AdminIncidentTable = () => {
       flex: 1,
       minWidth: 180,
       renderCell: (params) => (
-        <Tooltip title={params.value}>
+        <Tooltip title={params.value || 'No location specified'}>
           <Typography
             variant="body2"
             color="text.secondary"
@@ -299,7 +266,7 @@ const AdminIncidentTable = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            {params.value}
+            {params.value || '-'}
           </Typography>
         </Tooltip>
       ),
@@ -310,7 +277,7 @@ const AdminIncidentTable = () => {
       width: 110,
       renderCell: (params) => (
         <Typography variant="body2" color="text.secondary">
-          {format(new Date(params.value), 'MMM dd, yyyy')}
+          {formatDate(params.value)}
         </Typography>
       ),
     },
@@ -335,19 +302,6 @@ const AdminIncidentTable = () => {
               <Eye size={18} />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Assign Tanod">
-            <IconButton
-              size="small"
-              sx={{
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.info.main, 0.1),
-                  color: theme.palette.info.main,
-                },
-              }}
-            >
-              <UserCheck size={18} />
-            </IconButton>
-          </Tooltip>
           <Tooltip title="More Actions">
             <IconButton
               size="small"
@@ -367,16 +321,41 @@ const AdminIncidentTable = () => {
   ];
 
   const filteredRows = useMemo(() => {
-    return mockIncidents.filter((incident) => {
-      const matchesSearch = incident.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        incident.reporterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        incident.location.toLowerCase().includes(searchQuery.toLowerCase());
+    return incidents.filter((incident) => {
+      const searchableText = [
+        incident.title,
+        incident.description,
+        incident.reporterName,
+        incident.location,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      
+      const matchesSearch = searchableText.includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || incident.status === statusFilter;
       const matchesCategory = categoryFilter === 'all' || incident.category === categoryFilter;
       const matchesPriority = priorityFilter === 'all' || incident.priority === priorityFilter;
+      
       return matchesSearch && matchesStatus && matchesCategory && matchesPriority;
     });
-  }, [searchQuery, statusFilter, categoryFilter, priorityFilter]);
+  }, [incidents, searchQuery, statusFilter, categoryFilter, priorityFilter]);
+
+  if (error) {
+    return (
+      <Alert severity="error">
+        Failed to load incidents. Please check your Firebase connection.
+      </Alert>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Stack spacing={3}>
@@ -387,7 +366,7 @@ const AdminIncidentTable = () => {
             Incident Management
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Monitor, manage and resolve all barangay incidents
+            Monitor, manage and resolve all barangay incidents ({incidents.length} total)
           </Typography>
         </Stack>
         <Stack direction="row" spacing={2}>
@@ -418,20 +397,20 @@ const AdminIncidentTable = () => {
       {/* Statistics Cards */}
       <Stack direction="row" spacing={2} flexWrap="wrap">
         {[
-          { label: 'Total Reports', value: mockIncidents.length, color: theme.palette.primary.main },
+          { label: 'Total Reports', value: incidents.length, color: theme.palette.primary.main },
           {
             label: 'Pending',
-            value: mockIncidents.filter((i) => i.status === 'submitted').length,
+            value: incidents.filter((i) => i.status === 'submitted').length,
             color: theme.palette.info.main,
           },
           {
             label: 'In Progress',
-            value: mockIncidents.filter((i) => i.status === 'in-progress').length,
+            value: incidents.filter((i) => i.status === 'in-progress').length,
             color: theme.palette.warning.main,
           },
           {
             label: 'Resolved',
-            value: mockIncidents.filter((i) => i.status === 'resolved').length,
+            value: incidents.filter((i) => i.status === 'resolved').length,
             color: theme.palette.success.main,
           },
         ].map((stat, index) => (
@@ -496,7 +475,8 @@ const AdminIncidentTable = () => {
             <MenuItem value="all">All Priorities</MenuItem>
             <MenuItem value="emergency">Emergency</MenuItem>
             <MenuItem value="urgent">Urgent</MenuItem>
-            <MenuItem value="minor">Minor</MenuItem>
+            <MenuItem value="medium">Medium</MenuItem>
+            <MenuItem value="low">Low</MenuItem>
           </Select>
         </FormControl>
       </Stack>
@@ -547,19 +527,22 @@ const AdminIncidentTable = () => {
 
       {/* Context Menu */}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={() => {
+          if (selectedRow) navigate(`/incidents/${selectedRow.id}`);
+          handleMenuClose();
+        }}>
           <ListItemIcon>
-            <Edit size={18} />
+            <Eye size={18} />
           </ListItemIcon>
-          <ListItemText>Edit Incident</ListItemText>
+          <ListItemText>View Details</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={handleResolveIncident}>
           <ListItemIcon>
             <CheckCircle2 size={18} />
           </ListItemIcon>
           <ListItemText>Mark as Resolved</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleMenuClose} sx={{ color: 'error.main' }}>
+        <MenuItem onClick={handleDeleteIncident} sx={{ color: 'error.main' }}>
           <ListItemIcon>
             <Trash2 size={18} color={theme.palette.error.main} />
           </ListItemIcon>

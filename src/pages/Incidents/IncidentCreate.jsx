@@ -15,22 +15,30 @@ import {
   alpha,
   Alert,
   AlertTitle,
+  CircularProgress,
 } from '@mui/material';
 import { ArrowLeft, Upload, Sparkles, TrendingUp } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-toastify';
 import { classifyIncident, calculatePriorityScore, suggestResponseActions } from '../../services/aiService';
 import ResponseSuggestions from '../../components/ai/ResponseSuggestions';
+import { useCreateIncident } from '../../hooks/useIncidents';
+import { useAppSelector } from '../../store/hooks';
 
 const IncidentCreate = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { user } = useAppSelector((state) => state.auth);
+  const createIncident = useCreateIncident();
+  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: '',
     priority: '',
     location: '',
+    reporterName: '',
+    reporterContact: '',
   });
   const [aiClassification, setAiClassification] = useState(null);
   const [aiPriority, setAiPriority] = useState(null);
@@ -83,20 +91,38 @@ const IncidentCreate = () => {
     }
   }, [formData.title, formData.description, formData.category, formData.location]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Include AI data in submission
-    const submissionData = {
-      ...formData,
-      aiClassification,
-      aiPriority,
-      aiSuggestions,
-    createdAt: new Date().toISOString()
-    };
-    
-    toast.success('Incident reported successfully with AI analysis!');
-    navigate('/incidents');
+    try {
+      // Prepare incident data for Firebase
+      const incidentData = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        priority: formData.priority || aiPriority?.priority || 'medium',
+        location: formData.location,
+        reporterName: formData.reporterName || user?.displayName || 'Anonymous',
+        reporterContact: formData.reporterContact || user?.email || '',
+        userId: user?.uid || null,
+        status: 'submitted',
+        // Include AI analysis data
+        aiAnalysis: {
+          classification: aiClassification,
+          priorityScore: aiPriority,
+          suggestions: aiSuggestions,
+        },
+      };
+      
+      // Save to Firebase
+      await createIncident.mutateAsync(incidentData);
+      
+      // Success toast is automatically shown by the hook
+      navigate('/incidents');
+    } catch (error) {
+      console.error('Error creating incident:', error);
+      // Error toast is automatically shown by the hook
+    }
   };
 
   return (
@@ -131,6 +157,27 @@ const IncidentCreate = () => {
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   required
                   fullWidth
+                  placeholder="Brief summary of the incident"
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  label="Your Name"
+                  value={formData.reporterName}
+                  onChange={(e) => setFormData({ ...formData, reporterName: e.target.value })}
+                  fullWidth
+                  placeholder={user?.displayName || 'Your name'}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  label="Contact Number"
+                  value={formData.reporterContact}
+                  onChange={(e) => setFormData({ ...formData, reporterContact: e.target.value })}
+                  fullWidth
+                  placeholder={user?.email || 'Your contact info'}
                 />
               </Grid>
 
@@ -278,11 +325,17 @@ const IncidentCreate = () => {
                   <Button
                     variant="outlined"
                     onClick={() => navigate('/incidents')}
+                    disabled={createIncident.isPending}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" variant="contained" startIcon={<Sparkles size={18} />}>
-                    Submit Report with AI Analysis
+                  <Button 
+                    type="submit" 
+                    variant="contained" 
+                    startIcon={createIncident.isPending ? <CircularProgress size={18} /> : <Sparkles size={18} />}
+                    disabled={createIncident.isPending}
+                  >
+                    {createIncident.isPending ? 'Submitting...' : 'Submit Report with AI Analysis'}
                   </Button>
                 </Stack>
               </Grid>
