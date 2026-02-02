@@ -54,11 +54,30 @@ export const getAllIncidents = async () => {
  * @returns {Promise<Array>} Array of incidents
  */
 export const getIncidentsByStatus = async (status) => {
-  return await queryDocuments(
-    COLLECTIONS.INCIDENTS,
-    [{ field: 'status', operator: '==', value: status }],
-    { orderBy: { field: 'createdAt', direction: 'desc' } }
-  );
+  try {
+    // Try with orderBy first (requires composite index)
+    return await queryDocuments(
+      COLLECTIONS.INCIDENTS,
+      [{ field: 'status', operator: '==', value: status }],
+      { orderBy: { field: 'createdAt', direction: 'desc' } }
+    );
+  } catch (error) {
+    // If index error, fall back to query without orderBy
+    if (error.message?.includes('index') || error.code === 'failed-precondition') {
+      console.warn('Composite index not available, fetching without orderBy. Create the index for better performance.');
+      const incidents = await queryDocuments(
+        COLLECTIONS.INCIDENTS,
+        [{ field: 'status', operator: '==', value: status }]
+      );
+      // Sort in memory
+      return incidents.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(0);
+        const bTime = b.createdAt?.toDate?.() || new Date(0);
+        return bTime - aTime;
+      });
+    }
+    throw error;
+  }
 };
 
 /**
@@ -67,11 +86,30 @@ export const getIncidentsByStatus = async (status) => {
  * @returns {Promise<Array>} Array of incidents
  */
 export const getIncidentsByTanod = async (tanodId) => {
-  return await queryDocuments(
-    COLLECTIONS.INCIDENTS,
-    [{ field: 'assignedTo', operator: '==', value: tanodId }],
-    { orderBy: { field: 'createdAt', direction: 'desc' } }
-  );
+  try {
+    // Try with orderBy first (requires composite index)
+    return await queryDocuments(
+      COLLECTIONS.INCIDENTS,
+      [{ field: 'assignedTo', operator: '==', value: tanodId }],
+      { orderBy: { field: 'createdAt', direction: 'desc' } }
+    );
+  } catch (error) {
+    // If index error, fall back to query without orderBy
+    if (error.message?.includes('index') || error.code === 'failed-precondition') {
+      console.warn('Composite index not available, fetching without orderBy. Create the index for better performance.');
+      const incidents = await queryDocuments(
+        COLLECTIONS.INCIDENTS,
+        [{ field: 'assignedTo', operator: '==', value: tanodId }]
+      );
+      // Sort in memory
+      return incidents.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(0);
+        const bTime = b.createdAt?.toDate?.() || new Date(0);
+        return bTime - aTime;
+      });
+    }
+    throw error;
+  }
 };
 
 /**

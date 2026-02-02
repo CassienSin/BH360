@@ -149,19 +149,17 @@ const IncidentCreate = () => {
           }}
         >
           <CardContent>
-            <Grid container spacing={3}>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  label="Incident Title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                  fullWidth
-                  placeholder="Brief summary of the incident"
-                />
-              </Grid>
+            <Stack spacing={3}>
+              <TextField
+                label="Incident Title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                required
+                fullWidth
+                placeholder="Brief summary of the incident"
+              />
 
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
                 <TextField
                   label="Your Name"
                   value={formData.reporterName}
@@ -169,9 +167,7 @@ const IncidentCreate = () => {
                   fullWidth
                   placeholder={user?.displayName || 'Your name'}
                 />
-              </Grid>
 
-              <Grid size={{ xs: 12, md: 6 }}>
                 <TextField
                   label="Contact Number"
                   value={formData.reporterContact}
@@ -179,9 +175,9 @@ const IncidentCreate = () => {
                   fullWidth
                   placeholder={user?.email || 'Your contact info'}
                 />
-              </Grid>
+              </Stack>
 
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
                 <TextField
                   select
                   label="Category"
@@ -200,15 +196,14 @@ const IncidentCreate = () => {
                 >
                   <MenuItem value="crime">Crime</MenuItem>
                   <MenuItem value="noise">Noise</MenuItem>
+                  <MenuItem value="fire">Fire</MenuItem>
                   <MenuItem value="dispute">Dispute</MenuItem>
                   <MenuItem value="hazard">Hazard</MenuItem>
                   <MenuItem value="health">Health</MenuItem>
                   <MenuItem value="utility">Utility</MenuItem>
                   <MenuItem value="other">Other</MenuItem>
                 </TextField>
-              </Grid>
 
-              <Grid size={{ xs: 12, md: 6 }}>
                 <TextField
                   select
                   label="Priority"
@@ -229,33 +224,29 @@ const IncidentCreate = () => {
                   <MenuItem value="urgent">Urgent</MenuItem>
                   <MenuItem value="emergency">Emergency</MenuItem>
                 </TextField>
-              </Grid>
+              </Stack>
 
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  label="Location"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  required
-                  fullWidth
-                  placeholder="e.g., Purok 3, Barangay Hall Area"
-                />
-              </Grid>
+              <TextField
+                label="Location"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                required
+                fullWidth
+                placeholder="e.g., Purok 3, Barangay Hall Area"
+              />
 
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  label="Description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  required
-                  fullWidth
-                  multiline
-                  rows={4}
-                  placeholder="Provide detailed information about the incident..."
-                />
-              </Grid>
+              <TextField
+                label="Description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                required
+                fullWidth
+                multiline
+                rows={4}
+                placeholder="Provide detailed information about the incident..."
+              />
 
-              <Grid size={{ xs: 12 }}>
+              <Box>
                 <Typography variant="subtitle2" fontWeight={600} mb={1}>
                   Upload Photos/Videos (Optional)
                 </Typography>
@@ -285,61 +276,57 @@ const IncidentCreate = () => {
                     </Typography>
                   )}
                 </Box>
-              </Grid>
+              </Box>
 
               {showAiInsights && aiClassification && aiPriority && (
-                <Grid size={{ xs: 12 }}>
-                  <Alert
-                    severity="info"
-                    icon={<Sparkles size={20} />}
-                    sx={{
-                      borderRadius: 2,
-                      backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                    }}
-                  >
-                    <AlertTitle sx={{ fontWeight: 700 }}>AI Analysis Complete</AlertTitle>
-                    <Typography variant="body2" mb={1}>
-                      Classification: <strong>{aiClassification.category}</strong> ({aiClassification.confidence}% confidence) | 
-                      Priority Score: <strong>{aiPriority.score}/100</strong>
-                    </Typography>
-                    <Stack direction="row" spacing={1} flexWrap="wrap">
-                      {aiClassification.suggestedCategories.map(cat => (
-                        <Chip
-                          key={cat}
-                          label={cat}
-                          size="small"
-                          sx={{
-                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                            color: theme.palette.primary.main
-                          }}
-                        />
-                      ))}
-                    </Stack>
-                  </Alert>
-                </Grid>
+                <Alert
+                  severity="info"
+                  icon={<Sparkles size={20} />}
+                  sx={{
+                    borderRadius: 2,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                  }}
+                >
+                  <AlertTitle sx={{ fontWeight: 700 }}>AI Analysis Complete</AlertTitle>
+                  <Typography variant="body2" mb={1}>
+                    Classification: <strong>{aiClassification.category}</strong> ({aiClassification.confidence}% confidence) | 
+                    Priority Score: <strong>{aiPriority.score}/100</strong>
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    {aiClassification.alternativeCategories && aiClassification.alternativeCategories.map(cat => (
+                      <Chip
+                        key={cat.category}
+                        label={`${cat.category} (${cat.confidence}%)`}
+                        size="small"
+                        sx={{
+                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          color: theme.palette.primary.main
+                        }}
+                      />
+                    ))}
+                  </Stack>
+                </Alert>
               )}
 
-              <Grid size={{ xs: 12 }}>
-                <Stack direction="row" spacing={2} justifyContent="flex-end">
-                  <Button
-                    variant="outlined"
-                    onClick={() => navigate('/incidents')}
-                    disabled={createIncident.isPending}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    variant="contained" 
-                    startIcon={createIncident.isPending ? <CircularProgress size={18} /> : <Sparkles size={18} />}
-                    disabled={createIncident.isPending}
-                  >
-                    {createIncident.isPending ? 'Submitting...' : 'Submit Report with AI Analysis'}
-                  </Button>
-                </Stack>
-              </Grid>
-            </Grid>
+              <Stack direction="row" spacing={2} justifyContent="flex-end">
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/incidents')}
+                  disabled={createIncident.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  variant="contained" 
+                  startIcon={createIncident.isPending ? <CircularProgress size={18} /> : <Sparkles size={18} />}
+                  disabled={createIncident.isPending}
+                >
+                  {createIncident.isPending ? 'Submitting...' : 'Submit Report with AI Analysis'}
+                </Button>
+              </Stack>
+            </Stack>
           </CardContent>
         </Card>
       </form>

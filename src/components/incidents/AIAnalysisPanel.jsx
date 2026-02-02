@@ -106,16 +106,16 @@ const AIAnalysisPanel = ({ incident }) => {
                     }}
                   />
                 </Stack>
-                {aiClassification.suggestedCategories && aiClassification.suggestedCategories.length > 0 && (
+                {aiClassification.alternativeCategories && aiClassification.alternativeCategories.length > 0 && (
                   <Stack spacing={0.5}>
                     <Typography variant="caption" color="text.secondary">
                       Alternative Categories
                     </Typography>
                     <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                      {aiClassification.suggestedCategories.slice(0, 3).map((cat) => (
+                      {aiClassification.alternativeCategories.slice(0, 3).map((cat) => (
                         <Chip
-                          key={cat}
-                          label={cat}
+                          key={cat.category}
+                          label={`${cat.category} (${cat.confidence}%)`}
                           size="small"
                           variant="outlined"
                           sx={{

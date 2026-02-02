@@ -116,8 +116,8 @@ const TanodManagement = () => {
           {/* Dashboard Stats */}
           {activeTab === 0 && (
             <>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Stack direction="row" spacing={2} flexWrap="wrap">
+                <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
                   <Card
                     elevation={0}
                     sx={{
@@ -145,9 +145,9 @@ const TanodManagement = () => {
                       </Stack>
                     </CardContent>
                   </Card>
-                </Grid>
+                </Box>
 
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
                   <Card
                     elevation={0}
                     sx={{
@@ -175,9 +175,9 @@ const TanodManagement = () => {
                       </Stack>
                     </CardContent>
                   </Card>
-                </Grid>
+                </Box>
 
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
                   <Card
                     elevation={0}
                     sx={{
@@ -205,9 +205,9 @@ const TanodManagement = () => {
                       </Stack>
                     </CardContent>
                   </Card>
-                </Grid>
+                </Box>
 
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
                   <Card
                     elevation={0}
                     sx={{
@@ -235,8 +235,8 @@ const TanodManagement = () => {
                       </Stack>
                     </CardContent>
                   </Card>
-                </Grid>
-              </Grid>
+                </Box>
+              </Stack>
             </>
           )}
 
@@ -282,9 +282,9 @@ const TanodManagement = () => {
                       </Typography>
                     </Box>
                   ) : (
-                    <Grid container spacing={2}>
+                    <Stack direction="row" spacing={2} flexWrap="wrap">
                       {tanodMembers.map((tanod) => (
-                        <Grid size={{ xs: 12, md: 6, lg: 4 }} key={tanod.id}>
+                        <Box key={tanod.id} sx={{ flex: { xs: '1 1 100%', md: '1 1 calc(50% - 8px)', lg: '1 1 calc(33.333% - 11px)' } }}>
                           <Card
                             elevation={0}
                             className="hover-lift"
@@ -364,9 +364,9 @@ const TanodManagement = () => {
                               </Stack>
                             </CardContent>
                           </Card>
-                        </Grid>
+                        </Box>
                       ))}
-                    </Grid>
+                    </Stack>
                   )}
                 </Stack>
               )}

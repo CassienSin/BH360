@@ -188,8 +188,8 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
               <Typography variant="h6" fontWeight={600}>
                 Personal Information
               </Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
+              <Stack spacing={2}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   <TextField
                     fullWidth
                     label="First Name"
@@ -197,8 +197,6 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
                     onChange={(e) => handleChange('firstName', e.target.value)}
                     required
                   />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
                     fullWidth
                     label="Last Name"
@@ -206,8 +204,8 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
                     onChange={(e) => handleChange('lastName', e.target.value)}
                     required
                   />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                </Stack>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   <TextField
                     fullWidth
                     label="Email"
@@ -216,8 +214,6 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
                     onChange={(e) => handleChange('email', e.target.value)}
                     required
                   />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
                     fullWidth
                     label="Phone Number"
@@ -226,8 +222,8 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
                     required
                     placeholder="+63 912 345 6789"
                   />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                </Stack>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   <DatePicker
                     label="Date of Birth"
                     value={formData.dateOfBirth}
@@ -238,9 +234,8 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
                       },
                     }}
                   />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
                   <Autocomplete
+                    fullWidth
                     options={['active', 'inactive', 'on-leave']}
                     value={formData.status}
                     onChange={(e, value) => handleChange('status', value || 'active')}
@@ -252,18 +247,16 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
                         .join(' ')
                     }
                   />
-                </Grid>
-                <Grid size={{ xs: 12 }}>
-                  <TextField
-                    fullWidth
-                    label="Address"
-                    value={formData.address}
-                    onChange={(e) => handleChange('address', e.target.value)}
-                    multiline
-                    rows={2}
-                  />
-                </Grid>
-              </Grid>
+                </Stack>
+                <TextField
+                  fullWidth
+                  label="Address"
+                  value={formData.address}
+                  onChange={(e) => handleChange('address', e.target.value)}
+                  multiline
+                  rows={2}
+                />
+              </Stack>
             </Stack>
 
             <Divider />
@@ -273,16 +266,14 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
               <Typography variant="h6" fontWeight={600}>
                 Emergency Contact
               </Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
+              <Stack spacing={2}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   <TextField
                     fullWidth
                     label="Contact Name"
                     value={formData.emergencyContactName}
                     onChange={(e) => handleChange('emergencyContactName', e.target.value)}
                   />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
                     fullWidth
                     label="Relationship"
@@ -290,17 +281,15 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
                     onChange={(e) => handleChange('emergencyContactRelationship', e.target.value)}
                     placeholder="e.g., Spouse, Parent, Sibling"
                   />
-                </Grid>
-                <Grid size={{ xs: 12 }}>
-                  <TextField
-                    fullWidth
-                    label="Contact Phone"
-                    value={formData.emergencyContactPhone}
-                    onChange={(e) => handleChange('emergencyContactPhone', e.target.value)}
-                    placeholder="+63 912 345 6789"
-                  />
-                </Grid>
-              </Grid>
+                </Stack>
+                <TextField
+                  fullWidth
+                  label="Contact Phone"
+                  value={formData.emergencyContactPhone}
+                  onChange={(e) => handleChange('emergencyContactPhone', e.target.value)}
+                  placeholder="+63 912 345 6789"
+                />
+              </Stack>
             </Stack>
 
             <Divider />

@@ -130,11 +130,11 @@ const Dashboard = () => {
       ) : (
         <>
           {/* Stats Cards */}
-          <Grid container spacing={3}>
+          <Stack direction="row" spacing={3} flexWrap="wrap">
             {stats.map((stat, index) => {
               const Icon = stat.icon;
               return (
-                <Grid size={{ xs: 12, sm: 6, md: 3 }} key={stat.label}>
+                <Box key={stat.label} sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(25% - 18px)' } }}>
                   <Card
                     className="glass hover-lift"
                     sx={{
@@ -176,14 +176,14 @@ const Dashboard = () => {
                       </Stack>
                     </CardContent>
                   </Card>
-                </Grid>
+                </Box>
               );
             })}
-          </Grid>
+          </Stack>
 
           {/* Charts */}
-          <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 8 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+            <Box sx={{ flex: { xs: 1, md: 2 } }}>
               <Card
                 className="glass hover-lift"
                 sx={{
@@ -211,9 +211,9 @@ const Dashboard = () => {
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
-            </Grid>
+            </Box>
 
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Box sx={{ flex: 1 }}>
               <Card
                 className="glass hover-lift"
                 sx={{
@@ -262,8 +262,8 @@ const Dashboard = () => {
                   </Stack>
                 </CardContent>
               </Card>
-            </Grid>
-          </Grid>
+            </Box>
+          </Stack>
 
           {/* Recent Incidents */}
           <Card

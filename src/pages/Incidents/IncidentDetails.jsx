@@ -6,7 +6,6 @@ import {
   Button,
   Card,
   CardContent,
-  Grid,
   Box,
   Chip,
   Divider,
@@ -14,13 +13,31 @@ import {
   useTheme,
   IconButton,
   Tooltip,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import { ArrowLeft, MapPin, Calendar, User, Edit, Download, Share2, Clock, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import { useAppSelector } from '../../store/hooks';
+import { useIncident } from '../../hooks/useIncidents';
+import { useAllTanods } from '../../hooks/useTanod';
 import StatusUpdateDialog from '../../components/incidents/StatusUpdateDialog';
+import AssignTanodDialog from '../../components/incidents/AssignTanodDialog';
 import AIAnalysisPanel from '../../components/incidents/AIAnalysisPanel';
 import ActivityTimeline from '../../components/incidents/ActivityTimeline';
+
+// Fix leaflet default icon issue
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+const DEFAULT_COORDINATES = [14.5995, 120.9842];
 
 const IncidentDetails = () => {
   const { id } = useParams();
@@ -28,96 +45,49 @@ const IncidentDetails = () => {
   const theme = useTheme();
   const { user } = useAppSelector((state) => state.auth);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'tanod';
 
-  // Mock data with AI analysis - replace with actual API call
-  const incident = {
-    id,
-    title: 'Loud music disturbance at night',
-    description:
-      'There has been continuous loud music from a neighbor\'s house for the past 3 hours. Multiple residents have complained about the noise disturbance. The music is coming from a karaoke session that started at 10 PM and is still ongoing.',
-    category: 'noise',
-    priority: 'urgent',
-    status: 'in-progress',
-    location: {
-      address: 'Purok 3, Barangay Hall Area',
-      coordinates: [14.5995, 120.9842],
-    },
-    reporterName: 'Juan Dela Cruz',
-    reporterContact: '0912-345-6789',
-    reporterEmail: 'juan.delacruz@email.com',
-    assignedTo: 'Tanod Pedro Santos',
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    updatedAt: new Date(Date.now() - 1800000).toISOString(),
-    estimatedResolution: new Date(Date.now() + 7200000).toISOString(),
-    attachments: [
-      { name: 'noise_evidence.jpg', type: 'image', url: '#' },
-      { name: 'location_photo.jpg', type: 'image', url: '#' },
-    ],
-    // AI Analysis data
-    aiClassification: {
-      category: 'noise',
-      confidence: 92,
-      suggestedCategories: ['noise', 'dispute', 'other'],
-    },
-    aiPriority: {
-      score: 68,
-      priority: 'urgent',
-      factors: {
-        category: 15,
-        urgency: 25,
-        timeOfDay: 10,
-        location: 8,
-        other: 10,
-      },
-    },
-    aiSuggestions: [
-      { priority: 1, action: 'Send Tanod to investigate', icon: 'shield', urgent: true },
-      { priority: 2, action: 'Issue verbal warning to responsible party', icon: 'message-square', urgent: false },
-      { priority: 3, action: 'Explain barangay noise ordinance', icon: 'book', urgent: false },
-      { priority: 4, action: 'Document violation for records', icon: 'clipboard', urgent: false },
-      { priority: 5, action: 'Issue citation if repeated violation', icon: 'alert-triangle', urgent: false },
-      { priority: 10, action: 'Update incident status regularly', icon: 'refresh-cw', urgent: false },
-    ],
+  // Fetch incident data from Firebase
+  const { data: incident, isLoading, error } = useIncident(id);
+  
+  // Fetch tanods to get assigned tanod details
+  const { data: tanods = [] } = useAllTanods();
+
+  // Get assigned tanod details
+  const assignedTanod = tanods.find((t) => t.id === incident?.assignedTo);
+
+  // Parse location coordinates
+  const getLocationCoordinates = () => {
+    if (!incident?.location) return DEFAULT_COORDINATES;
+    
+    const coordMatch = incident.location.match(/\(([^,]+),\s*([^)]+)\)/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]);
+      const lng = parseFloat(coordMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return [lat, lng];
+      }
+    }
+    return DEFAULT_COORDINATES;
   };
 
-  // Activity timeline
-  const activities = [
-    {
-      type: 'status_change',
-      title: 'Status Updated',
-      description: 'Incident status changed',
-      timestamp: new Date(Date.now() - 1800000).toISOString(),
-      user: 'Admin User',
-      statusChange: { from: 'submitted', to: 'in-progress' },
-      notes: 'Tanod has been dispatched to investigate the situation.',
-    },
-    {
-      type: 'assigned',
-      title: 'Assigned to Tanod',
-      description: 'Incident assigned to Tanod Pedro Santos',
-      timestamp: new Date(Date.now() - 3000000).toISOString(),
-      user: 'Admin User',
-    },
-    {
-      type: 'created',
-      title: 'Incident Reported',
-      description: 'New incident report submitted by resident',
-      timestamp: incident.createdAt,
-      user: incident.reporterName,
-      notes: 'Initial report with AI analysis completed. Priority score: 68/100',
-    },
-  ];
+  const getLocationAddress = () => {
+    if (!incident?.location) return 'Location not specified';
+    return incident.location.split('(')[0].trim() || incident.location;
+  };
 
   const getCategoryColor = (category) => {
     const colors = {
       crime: theme.palette.error.main,
       noise: theme.palette.warning.main,
+      fire: theme.palette.error.main,
       hazard: theme.palette.info.main,
       dispute: theme.palette.secondary.main,
       health: theme.palette.error.main,
       utility: theme.palette.info.main,
+      other: theme.palette.grey[500],
     };
     return colors[category] || theme.palette.grey[500];
   };
@@ -126,6 +96,7 @@ const IncidentDetails = () => {
     const colors = {
       emergency: theme.palette.error.main,
       urgent: theme.palette.warning.main,
+      medium: theme.palette.warning.main,
       minor: theme.palette.info.main,
       low: theme.palette.success.main,
     };
@@ -149,15 +120,74 @@ const IncidentDetails = () => {
         icon: <Clock size={16} />,
         color: theme.palette.success.main,
       },
+      rejected: {
+        label: 'Rejected',
+        icon: <AlertCircle size={16} />,
+        color: theme.palette.error.main,
+      },
     };
     return configs[status] || configs.submitted;
   };
 
-  const handleStatusUpdate = (updateData) => {
-    // Here you would dispatch to Redux or call an API
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '-';
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    return format(date, 'MMM dd, yyyy HH:mm');
   };
 
+  // Activity timeline - simplified version
+  const activities = incident
+    ? [
+        incident.resolvedAt && {
+          type: 'resolved',
+          title: 'Incident Resolved',
+          description: 'Incident marked as resolved',
+          timestamp: incident.resolvedAt?.toDate ? incident.resolvedAt.toDate() : incident.resolvedAt,
+        },
+        incident.assignedTo && {
+          type: 'assigned',
+          title: 'Assigned to Tanod',
+          description: `Incident assigned to ${assignedTanod?.displayName || assignedTanod?.firstName || 'Tanod'}`,
+          timestamp: incident.updatedAt?.toDate ? incident.updatedAt.toDate() : incident.updatedAt,
+        },
+        {
+          type: 'created',
+          title: 'Incident Reported',
+          description: `New incident report submitted by ${incident.reporterName || 'resident'}`,
+          timestamp: incident.createdAt?.toDate ? incident.createdAt.toDate() : incident.createdAt,
+        },
+      ].filter(Boolean)
+    : [];
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <Stack spacing={2} alignItems="center">
+          <CircularProgress size={48} />
+          <Typography color="text.secondary">Loading incident details...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  // Error state
+  if (error || !incident) {
+    return (
+      <Stack spacing={3}>
+        <Button variant="outlined" startIcon={<ArrowLeft size={20} />} onClick={() => navigate('/incidents')}>
+          Back to Incidents
+        </Button>
+        <Alert severity="error">
+          {error ? 'Failed to load incident details. Please try again.' : 'Incident not found.'}
+        </Alert>
+      </Stack>
+    );
+  }
+
   const statusConfig = getStatusConfig(incident.status);
+  const coordinates = getLocationCoordinates();
+  const locationAddress = getLocationAddress();
 
   return (
     <Stack spacing={3}>
@@ -171,7 +201,7 @@ const IncidentDetails = () => {
             Incident Details
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Case #{id}
+            Case #{id.substring(0, 8)}
           </Typography>
         </Stack>
         <Stack direction="row" spacing={1}>
@@ -241,11 +271,11 @@ const IncidentDetails = () => {
                   {statusConfig.label}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Last updated {format(new Date(incident.updatedAt), 'MMM dd, yyyy HH:mm')}
+                  Last updated {formatDate(incident.updatedAt)}
                 </Typography>
               </Stack>
             </Stack>
-            {incident.estimatedResolution && incident.status !== 'resolved' && (
+            {incident.status !== 'resolved' && (
               <Stack
                 direction="row"
                 spacing={1}
@@ -259,10 +289,10 @@ const IncidentDetails = () => {
                 <Clock size={16} color={theme.palette.text.secondary} />
                 <Stack>
                   <Typography variant="caption" color="text.secondary">
-                    Estimated Resolution
+                    Reported
                   </Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    {format(new Date(incident.estimatedResolution), 'MMM dd, yyyy HH:mm')}
+                    {formatDate(incident.createdAt)}
                   </Typography>
                 </Stack>
               </Stack>
@@ -271,9 +301,13 @@ const IncidentDetails = () => {
         </CardContent>
       </Card>
 
-      <Grid container spacing={3}>
+      <Stack
+        direction={{ xs: 'column', lg: 'row' }}
+        spacing={3}
+        sx={{ alignItems: 'flex-start' }}
+      >
         {/* Main Content */}
-        <Grid size={{ xs: 12, lg: 8 }}>
+        <Box sx={{ flex: 1, width: '100%', maxWidth: { lg: 'calc(66.666% - 12px)' } }}>
           <Stack spacing={3}>
             {/* Incident Details Card */}
             <Card
@@ -289,7 +323,7 @@ const IncidentDetails = () => {
                   <Stack spacing={2}>
                     <Stack direction="row" spacing={1} flexWrap="wrap">
                       <Chip
-                        label={incident.category}
+                        label={incident.category || 'other'}
                         size="small"
                         sx={{
                           backgroundColor: alpha(getCategoryColor(incident.category), 0.1),
@@ -299,7 +333,7 @@ const IncidentDetails = () => {
                         }}
                       />
                       <Chip
-                        label={incident.priority}
+                        label={incident.priority || 'medium'}
                         size="small"
                         sx={{
                           backgroundColor: alpha(getPriorityColor(incident.priority), 0.1),
@@ -310,10 +344,10 @@ const IncidentDetails = () => {
                       />
                     </Stack>
                     <Typography variant="h5" fontWeight={700}>
-                      {incident.title}
+                      {incident.title || 'Untitled Incident'}
                     </Typography>
                     <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
-                      {incident.description}
+                      {incident.description || 'No description provided'}
                     </Typography>
                   </Stack>
 
@@ -327,78 +361,39 @@ const IncidentDetails = () => {
                     <Stack direction="row" spacing={1} alignItems="center">
                       <MapPin size={20} color={theme.palette.text.secondary} />
                       <Typography variant="body2" color="text.secondary">
-                        {incident.location.address}
+                        {locationAddress}
                       </Typography>
                     </Stack>
-                    <Box
-                      sx={{
-                        height: 200,
-                        borderRadius: 2,
-                        backgroundColor: alpha(theme.palette.grey[200], 0.5),
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: `1px solid ${theme.palette.divider}`,
-                      }}
-                    >
-                      <Typography variant="body2" color="text.secondary">
-                        Map View (Leaflet integration)
-                      </Typography>
+                    <Box sx={{ height: 200, borderRadius: 2, overflow: 'hidden' }}>
+                      <MapContainer
+                        center={coordinates}
+                        zoom={15}
+                        style={{ height: '100%', width: '100%' }}
+                      >
+                        <TileLayer
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        />
+                        <Marker position={coordinates}>
+                          <Popup>{locationAddress}</Popup>
+                        </Marker>
+                      </MapContainer>
                     </Box>
                   </Stack>
-
-                  {/* Attachments */}
-                  {incident.attachments && incident.attachments.length > 0 && (
-                    <>
-                      <Divider />
-                      <Stack spacing={2}>
-                        <Typography variant="subtitle1" fontWeight={600}>
-                          Attachments ({incident.attachments.length})
-                        </Typography>
-                        <Grid container spacing={1}>
-                          {incident.attachments.map((attachment, index) => (
-                            <Grid size={{ xs: 6, sm: 4 }} key={index}>
-                              <Box
-                                sx={{
-                                  height: 100,
-                                  borderRadius: 2,
-                                  backgroundColor: alpha(theme.palette.grey[200], 0.5),
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  border: `1px solid ${theme.palette.divider}`,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s',
-                                  '&:hover': {
-                                    borderColor: theme.palette.primary.main,
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                                  },
-                                }}
-                              >
-                                <Typography variant="caption" color="text.secondary" textAlign="center">
-                                  {attachment.name}
-                                </Typography>
-                              </Box>
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </Stack>
-                    </>
-                  )}
                 </Stack>
               </CardContent>
             </Card>
 
-            {/* AI Analysis */}
-            <AIAnalysisPanel incident={incident} />
+            {/* AI Analysis - only if data available */}
+            {incident.aiClassification && <AIAnalysisPanel incident={incident} />}
 
             {/* Activity Timeline */}
             <ActivityTimeline activities={activities} />
           </Stack>
-        </Grid>
+        </Box>
 
         {/* Sidebar */}
-        <Grid size={{ xs: 12, lg: 4 }}>
+        <Box sx={{ width: '100%', maxWidth: { lg: 'calc(33.333% - 12px)' } }}>
           <Stack spacing={3}>
             {/* Incident Information */}
             <Card
@@ -419,7 +414,7 @@ const IncidentDetails = () => {
                         Priority
                       </Typography>
                       <Chip
-                        label={incident.priority}
+                        label={incident.priority || 'medium'}
                         size="small"
                         sx={{
                           backgroundColor: alpha(getPriorityColor(incident.priority), 0.1),
@@ -435,33 +430,26 @@ const IncidentDetails = () => {
                         Reported by
                       </Typography>
                       <Typography variant="body2" fontWeight={600}>
-                        {incident.reporterName}
+                        {incident.reporterName || 'Anonymous'}
                       </Typography>
                     </Stack>
-                    {isAdmin && (
-                      <>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" color="text.secondary">
-                            Contact Info
-                          </Typography>
-                          <Typography variant="body2" fontWeight={500}>
-                            {incident.reporterContact}
-                          </Typography>
-                          {incident.reporterEmail && (
-                            <Typography variant="body2" fontWeight={500}>
-                              {incident.reporterEmail}
-                            </Typography>
-                          )}
-                        </Stack>
-                      </>
+                    {isAdmin && incident.reporterContact && (
+                      <Stack spacing={0.5}>
+                        <Typography variant="caption" color="text.secondary">
+                          Contact Info
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                          {incident.reporterContact}
+                        </Typography>
+                      </Stack>
                     )}
                     <Divider />
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2" color="text.secondary">
                         Assigned to
                       </Typography>
-                      <Typography variant="body2" fontWeight={600} color={incident.assignedTo ? 'text.primary' : 'text.disabled'}>
-                        {incident.assignedTo || 'Unassigned'}
+                      <Typography variant="body2" fontWeight={600} color={assignedTanod ? 'text.primary' : 'text.disabled'}>
+                        {assignedTanod?.displayName || assignedTanod?.firstName || 'Unassigned'}
                       </Typography>
                     </Stack>
                     <Divider />
@@ -470,7 +458,7 @@ const IncidentDetails = () => {
                         Created
                       </Typography>
                       <Typography variant="body2" fontWeight={600}>
-                        {format(new Date(incident.createdAt), 'MMM dd, yyyy')}
+                        {formatDate(incident.createdAt)}
                       </Typography>
                     </Stack>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -478,7 +466,7 @@ const IncidentDetails = () => {
                         Last Updated
                       </Typography>
                       <Typography variant="body2" fontWeight={600}>
-                        {format(new Date(incident.updatedAt), 'MMM dd, yyyy')}
+                        {formatDate(incident.updatedAt)}
                       </Typography>
                     </Stack>
                   </Stack>
@@ -501,11 +489,13 @@ const IncidentDetails = () => {
                       Quick Actions
                     </Typography>
                     <Stack spacing={1}>
-                      <Button variant="outlined" fullWidth startIcon={<Edit size={18} />}>
-                        Edit Incident
-                      </Button>
-                      <Button variant="outlined" fullWidth startIcon={<User size={18} />}>
-                        Reassign Tanod
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        startIcon={<User size={18} />}
+                        onClick={() => setAssignDialogOpen(true)}
+                      >
+                        {incident.assignedTo ? 'Reassign Tanod' : 'Assign Tanod'}
                       </Button>
                       <Button
                         variant="outlined"
@@ -524,8 +514,8 @@ const IncidentDetails = () => {
               </Card>
             )}
           </Stack>
-        </Grid>
-      </Grid>
+        </Box>
+      </Stack>
 
       {/* Status Update Dialog */}
       {isAdmin && (
@@ -533,7 +523,15 @@ const IncidentDetails = () => {
           open={statusDialogOpen}
           onClose={() => setStatusDialogOpen(false)}
           incident={incident}
-          onUpdate={handleStatusUpdate}
+        />
+      )}
+
+      {/* Assign Tanod Dialog */}
+      {isAdmin && (
+        <AssignTanodDialog
+          open={assignDialogOpen}
+          onClose={() => setAssignDialogOpen(false)}
+          incident={incident}
         />
       )}
     </Stack>

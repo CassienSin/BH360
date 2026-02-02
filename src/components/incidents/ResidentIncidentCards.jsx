@@ -39,8 +39,12 @@ const ResidentIncidentCards = () => {
     const colors = {
       crime: theme.palette.error.main,
       noise: theme.palette.warning.main,
+      fire: theme.palette.error.main,
       hazard: theme.palette.info.main,
       dispute: theme.palette.secondary.main,
+      health: theme.palette.error.main,
+      utility: theme.palette.info.main,
+      other: theme.palette.grey[500],
     };
     return colors[category] || theme.palette.grey[500];
   };
@@ -149,7 +153,14 @@ const ResidentIncidentCards = () => {
       <Grid container spacing={2}>
         {filteredIncidents.length > 0 ? (
           filteredIncidents.map((incident) => (
-            <Grid size={{ xs: 12, md: 6, lg: 4 }} key={incident.id}>
+            <Box 
+              key={incident.id}
+              sx={{ 
+                width: { xs: '100%', md: '50%', lg: '33.333%' },
+                px: 1,
+                mb: 2
+              }}
+            >
               <Card
                 elevation={0}
                 sx={{
@@ -212,10 +223,10 @@ const ResidentIncidentCards = () => {
                   </Stack>
                 </CardContent>
               </Card>
-            </Grid>
+            </Box>
           ))
         ) : (
-          <Grid size={12}>
+          <Box sx={{ width: '100%', px: 1 }}>
             <Box
               sx={{
                 textAlign: 'center',
@@ -242,7 +253,7 @@ const ResidentIncidentCards = () => {
                 </Button>
               )}
             </Box>
-          </Grid>
+          </Box>
         )}
       </Grid>
     </Stack>

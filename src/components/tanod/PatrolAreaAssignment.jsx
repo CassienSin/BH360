@@ -102,9 +102,9 @@ const PatrolAreaAssignment = () => {
         </Typography>
       </Stack>
 
-      <Grid container spacing={3}>
+      <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3}>
         {/* Map View */}
-        <Grid size={{ xs: 12, lg: 7 }}>
+        <Box sx={{ flex: { xs: 1, lg: '0 0 58.333%' } }}>
           <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
             <CardContent>
               <Stack spacing={2}>
@@ -184,10 +184,10 @@ const PatrolAreaAssignment = () => {
               </Stack>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
         {/* Area List */}
-        <Grid size={{ xs: 12, lg: 5 }}>
+        <Box sx={{ flex: 1 }}>
           <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
             <CardContent>
               <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -308,8 +308,8 @@ const PatrolAreaAssignment = () => {
               </List>
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+      </Stack>
 
       {/* Assignment Dialog */}
       <Dialog

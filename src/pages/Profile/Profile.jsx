@@ -16,8 +16,8 @@ const Profile = () => {
         </Typography>
       </Stack>
 
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 4 }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+        <Box sx={{ flex: { xs: 1, md: '0 0 33.333%' } }}>
           <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <CardContent>
               <Stack spacing={3} alignItems="center">
@@ -56,9 +56,9 @@ const Profile = () => {
               </Stack>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
-        <Grid size={{ xs: 12, md: 8 }}>
+        <Box sx={{ flex: 1 }}>
           <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <CardContent>
               <Stack spacing={3}>
@@ -66,29 +66,21 @@ const Profile = () => {
                   Personal Information
                 </Typography>
 
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                <Stack spacing={2}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                     <TextField label="First Name" defaultValue={user?.firstName} fullWidth />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField label="Last Name" defaultValue={user?.lastName} fullWidth />
-                  </Grid>
-                  <Grid size={{ xs: 12 }}>
-                    <TextField label="Email" type="email" defaultValue={user?.email} fullWidth />
-                  </Grid>
-                  <Grid size={{ xs: 12 }}>
-                    <TextField label="Phone Number" defaultValue={user?.phoneNumber} fullWidth />
-                  </Grid>
-                  <Grid size={{ xs: 12 }}>
-                    <TextField
-                      label="Address"
-                      defaultValue={user?.address}
-                      multiline
-                      rows={2}
-                      fullWidth
-                    />
-                  </Grid>
-                </Grid>
+                  </Stack>
+                  <TextField label="Email" type="email" defaultValue={user?.email} fullWidth />
+                  <TextField label="Phone Number" defaultValue={user?.phoneNumber} fullWidth />
+                  <TextField
+                    label="Address"
+                    defaultValue={user?.address}
+                    multiline
+                    rows={2}
+                    fullWidth
+                  />
+                </Stack>
 
                 <Divider />
 
@@ -101,8 +93,8 @@ const Profile = () => {
               </Stack>
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+      </Stack>
     </Stack>
   );
 };

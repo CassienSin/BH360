@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Stack,
   Typography,
@@ -36,17 +36,19 @@ const PerformanceInsights = () => {
 
   const isLoading = loadingTanods || loadingIncidents || loadingAttendance;
 
-  // Calculate incident responses (incidents assigned to tanods)
-  const incidentResponses = allIncidents
-    .filter(inc => inc.assignedTo)
-    .map(inc => ({
-      id: inc.id,
-      tanodId: inc.assignedTo,
-      incidentId: inc.id,
-      status: inc.status,
-      createdAt: inc.createdAt,
-      respondedAt: inc.updatedAt,
-    }));
+  // Calculate incident responses (incidents assigned to tanods) - memoized to prevent infinite re-renders
+  const incidentResponses = useMemo(() => {
+    return allIncidents
+      .filter(inc => inc.assignedTo)
+      .map(inc => ({
+        id: inc.id,
+        tanodId: inc.assignedTo,
+        incidentId: inc.id,
+        status: inc.status,
+        createdAt: inc.createdAt,
+        respondedAt: inc.updatedAt,
+      }));
+  }, [allIncidents]);
 
   useEffect(() => {
     if (tanodMembers.length > 0 && !isLoading) {
@@ -151,7 +153,7 @@ const PerformanceInsights = () => {
         </Stack>
       </Stack>
 
-      {/* Team Overview Stats */}
+      {/* Enhanced Team Overview Stats */}
       {teamStats && (
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -206,7 +208,7 @@ const PerformanceInsights = () => {
                       Avg Response Time
                     </Typography>
                     <Typography variant="h3" fontWeight={700} color="success.main">
-                      {teamStats.avgResponseTime}
+                      {teamStats.avgResponseTime}m
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Minutes
@@ -236,10 +238,10 @@ const PerformanceInsights = () => {
                 <Stack direction="row" justifyContent="space-between" alignItems="start">
                   <Stack spacing={1}>
                     <Typography variant="body2" color="text.secondary">
-                      Attendance Rate
+                      Resolution Rate
                     </Typography>
                     <Typography variant="h3" fontWeight={700} color="info.main">
-                      {teamStats.attendanceRate}%
+                      {teamStats.avgResolutionRate}%
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Team Average
@@ -288,7 +290,7 @@ const PerformanceInsights = () => {
         </Grid>
       )}
 
-      {/* AI Insights */}
+      {/* Enhanced AI Insights */}
       <Card
         elevation={0}
         sx={{
@@ -312,14 +314,26 @@ const PerformanceInsights = () => {
             >
               <Brain size={24} color={theme.palette.primary.main} />
             </Box>
-            <Stack>
+            <Stack flexGrow={1}>
               <Typography variant="h6" fontWeight={700}>
                 AI-Generated Performance Insights
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Analyzing performance of {tanodMembers.length} tanod members
+                Analyzing {tanodMembers.length} tanod members • Enhanced AI v2.0
               </Typography>
             </Stack>
+            {teamStats?.capacityUtilization && (
+              <Chip
+                label={`${teamStats.capacityUtilization}% Capacity`}
+                size="small"
+                sx={{
+                  backgroundColor: alpha(theme.palette.info.main, 0.15),
+                  color: theme.palette.info.main,
+                  fontWeight: 700,
+                  fontSize: '0.75rem'
+                }}
+              />
+            )}
           </Stack>
 
           {teamStats && teamStats.insights && (
@@ -343,6 +357,91 @@ const PerformanceInsights = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Team Performance Distribution */}
+      {teamStats?.performanceDistribution && (
+        <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+          <CardContent>
+            <Typography variant="h6" fontWeight={600} mb={2}>
+              Team Performance Distribution
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: alpha(theme.palette.success.main, 0.08),
+                    border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+                    textAlign: 'center'
+                  }}
+                >
+                  <Typography variant="h3" fontWeight={700} color="success.main">
+                    {teamStats.performanceDistribution.excellent}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Excellent (90+)
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: alpha(theme.palette.info.main, 0.08),
+                    border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                    textAlign: 'center'
+                  }}
+                >
+                  <Typography variant="h3" fontWeight={700} color="info.main">
+                    {teamStats.performanceDistribution.good}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Good (70-89)
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: alpha(theme.palette.warning.main, 0.08),
+                    border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
+                    textAlign: 'center'
+                  }}
+                >
+                  <Typography variant="h3" fontWeight={700} color="warning.main">
+                    {teamStats.performanceDistribution.average}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Average (50-69)
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: alpha(theme.palette.error.main, 0.08),
+                    border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                    textAlign: 'center'
+                  }}
+                >
+                  <Typography variant="h3" fontWeight={700} color="error.main">
+                    {teamStats.performanceDistribution.poor}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Needs Help (&lt;50)
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Individual Performance Cards */}
       <Stack spacing={2}>

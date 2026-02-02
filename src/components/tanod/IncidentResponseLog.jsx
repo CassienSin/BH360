@@ -140,8 +140,8 @@ const IncidentResponseLog = () => {
         </Stack>
 
         {/* Stats Cards */}
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Stack direction="row" spacing={2} flexWrap="wrap">
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
             <Card
               elevation={0}
               sx={{
@@ -164,9 +164,9 @@ const IncidentResponseLog = () => {
                 </Stack>
               </CardContent>
             </Card>
-          </Grid>
+          </Box>
 
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
             <Card
               elevation={0}
               sx={{
@@ -189,9 +189,9 @@ const IncidentResponseLog = () => {
                 </Stack>
               </CardContent>
             </Card>
-          </Grid>
+          </Box>
 
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
             <Card
               elevation={0}
               sx={{
@@ -214,9 +214,9 @@ const IncidentResponseLog = () => {
                 </Stack>
               </CardContent>
             </Card>
-          </Grid>
+          </Box>
 
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
             <Card
               elevation={0}
               sx={{
@@ -239,8 +239,8 @@ const IncidentResponseLog = () => {
                 </Stack>
               </CardContent>
             </Card>
-          </Grid>
-        </Grid>
+          </Box>
+        </Stack>
 
         {/* Severity Breakdown */}
         <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
@@ -248,9 +248,9 @@ const IncidentResponseLog = () => {
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Incidents by Severity
             </Typography>
-            <Grid container spacing={2}>
+            <Stack direction="row" spacing={2} flexWrap="wrap">
               {Object.entries(severityCounts).map(([severity, count]) => (
-                <Grid size={{ xs: 6, sm: 3 }} key={severity}>
+                <Box key={severity} sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
                   <Stack spacing={1}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2" color="text.secondary" textTransform="capitalize">
@@ -274,9 +274,9 @@ const IncidentResponseLog = () => {
                       }}
                     />
                   </Stack>
-                </Grid>
+                </Box>
               ))}
-            </Grid>
+            </Stack>
           </CardContent>
         </Card>
 

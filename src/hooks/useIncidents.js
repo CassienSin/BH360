@@ -10,6 +10,7 @@ import {
   getIncident,
   getAllIncidents,
   getIncidentsByStatus,
+  getIncidentsByTanod,
   getRecentIncidents,
   updateIncident,
   assignIncident,
@@ -24,6 +25,7 @@ const QUERY_KEYS = {
   ALL: ['incidents'],
   DETAIL: (id) => ['incidents', id],
   BY_STATUS: (status) => ['incidents', 'status', status],
+  BY_TANOD: (tanodId) => ['incidents', 'tanod', tanodId],
   RECENT: (limit) => ['incidents', 'recent', limit],
   STATS: ['incidents', 'stats'],
 };
@@ -60,6 +62,19 @@ export const useIncidentsByStatus = (status, options = {}) => {
     queryKey: QUERY_KEYS.BY_STATUS(status),
     queryFn: () => getIncidentsByStatus(status),
     enabled: !!status,
+    ...options,
+  });
+};
+
+/**
+ * Hook to fetch incidents assigned to a tanod
+ */
+export const useIncidentsByTanod = (tanodId, options = {}) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.BY_TANOD(tanodId),
+    queryFn: () => getIncidentsByTanod(tanodId),
+    enabled: !!tanodId,
+    staleTime: 30000,
     ...options,
   });
 };
@@ -215,6 +230,7 @@ export default {
   useAllIncidents,
   useIncident,
   useIncidentsByStatus,
+  useIncidentsByTanod,
   useRecentIncidents,
   useIncidentStats,
   useIncidentsRealtime,

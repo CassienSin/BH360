@@ -122,7 +122,10 @@ const ActivityTimeline = ({ activities = [] }) => {
                     {activity.title}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {format(new Date(activity.timestamp), 'MMM dd, yyyy HH:mm')}
+                    {activity.timestamp ? format(
+                      activity.timestamp?.toDate ? activity.timestamp.toDate() : new Date(activity.timestamp),
+                      'MMM dd, yyyy HH:mm'
+                    ) : '-'}
                   </Typography>
                 </Stack>
                 <Typography variant="body2" color="text.secondary">

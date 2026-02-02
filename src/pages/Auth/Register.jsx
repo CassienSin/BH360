@@ -106,40 +106,36 @@ const Register = () => {
           </Alert>
         )}
 
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              label="First Name"
-              value={formData.firstName}
-              onChange={handleChange('firstName')}
-              required
-              fullWidth
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <User size={20} />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              label="Last Name"
-              value={formData.lastName}
-              onChange={handleChange('lastName')}
-              required
-              fullWidth
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <User size={20} />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-        </Grid>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <TextField
+            label="First Name"
+            value={formData.firstName}
+            onChange={handleChange('firstName')}
+            required
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <User size={20} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            label="Last Name"
+            value={formData.lastName}
+            onChange={handleChange('lastName')}
+            required
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <User size={20} />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Stack>
 
         <TextField
           label="Email Address"

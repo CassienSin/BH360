@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
@@ -72,9 +72,8 @@ const AppContent = () => {
 
   return (
     <>
-      <Router>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
           {/* Default Route - Redirect to Login */}
           <Route path="/" element={<Navigate to="/login" replace />} />
 
@@ -123,9 +122,8 @@ const AppContent = () => {
 
           {/* 404 - Redirect to Login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Suspense>
-      </Router>
+        </Routes>
+      </Suspense>
       <ToastContainer
         position="top-right"
         autoClose={3000}

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useSelector } from 'react-redux';
 import {
   Stack,
   Typography,
@@ -14,7 +15,8 @@ import {
   DialogContent,
   DialogActions,
   Divider,
-  Grid,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   MapPin,
@@ -23,12 +25,15 @@ import {
   XCircle,
   AlertCircle,
   Navigation,
+  AlertTriangle,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+
+import { useIncidentsByTanod, useIncidentsByStatus, useUpdateIncident, useAssignIncident } from '../../hooks/useIncidents';
 
 // Fix leaflet default icon issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -38,88 +43,151 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+// Default coordinates for Manila if no coordinates provided
+const DEFAULT_COORDINATES = [14.5995, 120.9842];
+
 const TaskManagement = () => {
   const theme = useTheme();
   const [selectedTask, setSelectedTask] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [tasks, setTasks] = useState([
-    {
-      id: '1',
-      title: 'Patrol Area 5',
-      description: 'Conduct routine patrol in residential area 5. Report any suspicious activities.',
-      priority: 'medium',
-      status: 'pending',
-      location: {
-        address: '123 Main Street, Barangay Hall',
-        coordinates: [14.5995, 120.9842],
-      },
-      assignedDate: new Date(),
-      dueDate: new Date(Date.now() + 86400000 * 2),
-    },
-    {
-      id: '2',
-      title: 'Respond to Noise Complaint',
-      description: 'Investigate noise complaint at residential complex. Coordinate with residents.',
-      priority: 'high',
-      status: 'pending',
-      location: {
-        address: '456 Oak Avenue, Block 3',
-        coordinates: [14.5985, 120.9852],
-      },
-      assignedDate: new Date(),
-      dueDate: new Date(Date.now() + 86400000),
-    },
-    {
-      id: '3',
-      title: 'Security Check at Market',
-      description: 'Perform security inspection at the local market area during peak hours.',
-      priority: 'low',
-      status: 'accepted',
-      location: {
-        address: '789 Market Street, Public Market',
-        coordinates: [14.6005, 120.9832],
-      },
-      assignedDate: new Date(Date.now() - 86400000),
-      dueDate: new Date(Date.now() + 86400000 * 3),
-    },
-  ]);
+  
+  // Get current user from Redux
+  const currentUser = useSelector((state) => state.auth.user);
+  
+  // Fetch incidents assigned to current tanod (use uid not id)
+  const { data: assignedIncidents = [], isLoading: loadingAssigned, error: errorAssigned } = useIncidentsByTanod(currentUser?.uid);
+  
+  // Fetch unassigned/submitted incidents that Tanod can accept
+  const { data: availableIncidents = [], isLoading: loadingAvailable, error: errorAvailable } = useIncidentsByStatus('submitted');
+  
+  // Combine both datasets - filter out incidents already assigned to someone else
+  const allIncidents = useMemo(() => {
+    // Get unassigned incidents (no assignedTo or assignedTo is null)
+    const unassignedIncidents = availableIncidents.filter(inc => !inc.assignedTo);
+    
+    // Combine assigned incidents with unassigned ones
+    return [...assignedIncidents, ...unassignedIncidents];
+  }, [assignedIncidents, availableIncidents]);
+  
+  const isLoading = loadingAssigned || loadingAvailable;
+  const error = errorAssigned || errorAvailable;
+  
+  // Mutations
+  const updateIncidentMutation = useUpdateIncident();
+  const assignIncidentMutation = useAssignIncident();
+
+  // Convert incidents to tasks format
+  const tasks = useMemo(() => {
+    return allIncidents.map((incident) => {
+      // Parse location - handle different formats
+      let coordinates = DEFAULT_COORDINATES;
+      let address = incident.location || 'Location not specified';
+      
+      // If location contains coordinates in format "address (lat, lng)"
+      const coordMatch = incident.location?.match(/\(([^,]+),\s*([^)]+)\)/);
+      if (coordMatch && incident.location) {
+        const lat = parseFloat(coordMatch[1]);
+        const lng = parseFloat(coordMatch[2]);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          coordinates = [lat, lng];
+        }
+        // Extract address without coordinates
+        address = incident.location.split('(')[0].trim();
+      }
+
+      // Determine task status based on assignment and incident status
+      let taskStatus = 'pending';
+      if (incident.assignedTo === currentUser?.uid) {
+        // Assigned to current user
+        if (incident.status === 'resolved') {
+          taskStatus = 'completed';
+        } else if (incident.status === 'in-progress') {
+          taskStatus = 'accepted';
+        } else {
+          taskStatus = 'pending';
+        }
+      } else if (!incident.assignedTo && incident.status === 'submitted') {
+        // Unassigned - available to accept
+        taskStatus = 'available';
+      }
+
+      return {
+        id: incident.id,
+        title: incident.title || 'Untitled Incident',
+        description: incident.description || 'No description provided',
+        priority: incident.priority || 'medium',
+        status: taskStatus,
+        category: incident.category || 'other',
+        isAssignedToMe: incident.assignedTo === currentUser?.uid,
+        location: {
+          address: address,
+          coordinates: coordinates,
+        },
+        assignedDate: incident.createdAt?.toDate ? incident.createdAt.toDate() : new Date(),
+        dueDate: incident.updatedAt?.toDate 
+          ? new Date(incident.updatedAt.toDate().getTime() + 86400000 * 2)
+          : new Date(Date.now() + 86400000 * 2),
+        reporterName: incident.reporterName,
+        reporterContact: incident.reporterContact,
+      };
+    });
+  }, [allIncidents, currentUser?.uid]);
 
   const handleViewTask = (task) => {
     setSelectedTask(task);
     setOpenDialog(true);
   };
 
-  const handleAcceptTask = (taskId) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId ? { ...task, status: 'accepted' } : task
-      )
-    );
-    toast.success('Task accepted successfully!');
-    setOpenDialog(false);
+  const handleAcceptTask = async (task) => {
+    try {
+      // If task is available (unassigned), assign it to current tanod
+      if (task.status === 'available') {
+        await assignIncidentMutation.mutateAsync({
+          incidentId: task.id,
+          tanodId: currentUser?.uid,
+        });
+      } else {
+        // If already assigned, just update status to in-progress
+        await updateIncidentMutation.mutateAsync({
+          incidentId: task.id,
+          updates: { status: 'in-progress' },
+        });
+      }
+      setOpenDialog(false);
+    } catch (error) {
+      console.error('Error accepting task:', error);
+    }
   };
 
   const handleDeclineTask = (taskId) => {
-    toast.info('Task declined');
+    toast.info('Task declined. Please contact admin to reassign.');
     setOpenDialog(false);
   };
 
-  const handleCompleteTask = (taskId) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId ? { ...task, status: 'completed' } : task
-      )
-    );
-    toast.success('Task marked as completed!');
-    setOpenDialog(false);
+  const handleCompleteTask = async (taskId) => {
+    try {
+      await updateIncidentMutation.mutateAsync({
+        incidentId: taskId,
+        updates: { 
+          status: 'resolved',
+          resolvedAt: new Date(),
+        },
+      });
+      setOpenDialog(false);
+    } catch (error) {
+      console.error('Error completing task:', error);
+    }
   };
 
   const getPriorityColor = (priority) => {
     switch (priority) {
+      case 'emergency':
+      case 'urgent':
       case 'high':
         return theme.palette.error.main;
       case 'medium':
         return theme.palette.warning.main;
+      case 'minor':
       case 'low':
         return theme.palette.success.main;
       default:
@@ -127,18 +195,171 @@ const TaskManagement = () => {
     }
   };
 
+  const getPriorityLabel = (priority) => {
+    const map = {
+      'emergency': 'Emergency',
+      'urgent': 'Urgent',
+      'high': 'High',
+      'medium': 'Medium',
+      'minor': 'Minor',
+      'low': 'Low',
+    };
+    return map[priority] || priority;
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
         return 'success';
-      case 'in-progress':
-        return 'info';
       case 'accepted':
-        return 'primary';
+        return 'info';
+      case 'available':
+        return 'warning';
+      case 'pending':
+        return 'warning';
       default:
         return 'default';
     }
   };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'available':
+        return 'Available';
+      case 'pending':
+        return 'Pending';
+      case 'accepted':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      default:
+        return status;
+    }
+  };
+
+  const getCategoryIcon = (category) => {
+    const iconProps = { size: 18, color: theme.palette.text.secondary };
+    switch (category) {
+      case 'crime':
+      case 'dispute':
+        return <AlertTriangle {...iconProps} />;
+      default:
+        return <AlertCircle {...iconProps} />;
+    }
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <Stack spacing={2} alignItems="center">
+          <CircularProgress size={48} />
+          <Typography color="text.secondary">Loading your tasks...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  // Error state
+  if (error) {
+    // More detailed error messaging
+    const errorMessage = errorAssigned?.message || errorAvailable?.message || 'Unknown error';
+    const isPermissionError = errorMessage.toLowerCase().includes('permission') || 
+                             errorMessage.toLowerCase().includes('denied') ||
+                             errorMessage.toLowerCase().includes('insufficient');
+    const isIndexError = errorMessage.toLowerCase().includes('index') ||
+                        errorMessage.toLowerCase().includes('requires an index');
+    
+    console.error('Task loading error:', { errorAssigned, errorAvailable, errorMessage });
+    
+    return (
+      <Stack spacing={3}>
+        <Typography variant="h4" fontWeight={700}>
+          Task Management
+        </Typography>
+        <Alert severity="error">
+          <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+            Failed to load tasks
+          </Typography>
+          {isPermissionError && (
+            <>
+              <Typography variant="body2" paragraph>
+                Permission denied. Your Firestore security rules may be blocking access.
+              </Typography>
+              <Typography variant="body2">
+                <strong>Quick fix:</strong> Update your Firestore security rules in Firebase Console.
+                See FIREBASE_TROUBLESHOOTING_TASKS.md for detailed instructions.
+              </Typography>
+            </>
+          )}
+          {isIndexError && (
+            <>
+              <Typography variant="body2" paragraph>
+                A required database index is missing.
+              </Typography>
+              <Typography variant="body2">
+                <strong>Quick fix:</strong> Check your browser console for a link to create the index automatically.
+              </Typography>
+            </>
+          )}
+          {!isPermissionError && !isIndexError && (
+            <>
+              <Typography variant="body2" paragraph>
+                {errorMessage}
+              </Typography>
+              <Typography variant="body2">
+                Please check:
+                • Firestore security rules allow read access
+                • You are logged in with a Tanod account
+                • Firebase connection is working
+              </Typography>
+            </>
+          )}
+        </Alert>
+        <Alert severity="info">
+          <Typography variant="body2">
+            <strong>Common solutions:</strong>
+          </Typography>
+          <Typography variant="body2" component="div">
+            1. Update Firestore security rules (see FIREBASE_TROUBLESHOOTING_TASKS.md)<br />
+            2. Create required database indexes<br />
+            3. Ensure you're logged in as a Tanod user<br />
+            4. Check browser console for detailed error messages
+          </Typography>
+        </Alert>
+      </Stack>
+    );
+  }
+
+  // Empty state
+  if (tasks.length === 0) {
+    return (
+      <Stack spacing={3}>
+        <Stack spacing={1}>
+          <Typography variant="h4" fontWeight={700} className="gradient-text">
+            Task Management
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            View and manage your assigned tasks
+          </Typography>
+        </Stack>
+        <Card className="glass">
+          <CardContent>
+            <Stack spacing={2} alignItems="center" py={4}>
+              <CheckCircle size={48} color={theme.palette.success.main} />
+              <Typography variant="h6" fontWeight={600}>
+                No Tasks Assigned
+              </Typography>
+              <Typography variant="body2" color="text.secondary" textAlign="center">
+                You don't have any tasks assigned at the moment. <br />
+                Check back later for new assignments.
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Stack>
+    );
+  }
 
   return (
     <Stack spacing={3} className="animate-fade-in">
@@ -147,13 +368,59 @@ const TaskManagement = () => {
           Task Management
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          View and manage your assigned tasks
+          View and manage your assigned tasks ({tasks.length} active)
         </Typography>
       </Stack>
 
-      <Grid container spacing={2}>
+      {/* Task Stats */}
+      <Stack direction="row" spacing={2} flexWrap="wrap">
+        <Card className="glass" sx={{ flex: 1, minWidth: 140 }}>
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" color="text.secondary">
+                Available
+              </Typography>
+              <Typography variant="h5" fontWeight={700} color="warning.main">
+                {tasks.filter(t => t.status === 'available').length}
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+        <Card className="glass" sx={{ flex: 1, minWidth: 140 }}>
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" color="text.secondary">
+                In Progress
+              </Typography>
+              <Typography variant="h5" fontWeight={700} color="info.main">
+                {tasks.filter(t => t.status === 'accepted').length}
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+        <Card className="glass" sx={{ flex: 1, minWidth: 140 }}>
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" color="text.secondary">
+                Completed
+              </Typography>
+              <Typography variant="h5" fontWeight={700} color="success.main">
+                {tasks.filter(t => t.status === 'completed').length}
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Stack>
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+          gap: 2,
+        }}
+      >
         {tasks.map((task, index) => (
-          <Grid size={{ xs: 12, md: 6 }} key={task.id}>
+          <Box key={task.id}>
             <Card
               className="glass hover-lift"
               sx={{
@@ -165,15 +432,18 @@ const TaskManagement = () => {
                 <Stack spacing={2}>
                   <Stack direction="row" justifyContent="space-between" alignItems="start">
                     <Stack spacing={1} flexGrow={1}>
-                      <Typography variant="h6" fontWeight={600}>
-                        {task.title}
-                      </Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        {getCategoryIcon(task.category)}
+                        <Typography variant="h6" fontWeight={600}>
+                          {task.title}
+                        </Typography>
+                      </Stack>
                       <Typography variant="body2" color="text.secondary">
                         {task.description}
                       </Typography>
                     </Stack>
                     <Chip
-                      label={task.status.replace('-', ' ')}
+                      label={getStatusLabel(task.status)}
                       color={getStatusColor(task.status)}
                       size="small"
                       sx={{ textTransform: 'capitalize', ml: 1 }}
@@ -190,21 +460,21 @@ const TaskManagement = () => {
                       }}
                     />
                     <Typography variant="caption" color="text.secondary" textTransform="capitalize">
-                      {task.priority} Priority
+                      {getPriorityLabel(task.priority)} Priority
                     </Typography>
                   </Stack>
 
                   <Stack spacing={1}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <MapPin size={16} color={theme.palette.text.secondary} />
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" noWrap>
                         {task.location.address}
                       </Typography>
                     </Stack>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Clock size={16} color={theme.palette.text.secondary} />
                       <Typography variant="body2" color="text.secondary">
-                        Due: {format(task.dueDate, 'MMM dd, yyyy')}
+                        Assigned: {format(task.assignedDate, 'MMM dd, yyyy')}
                       </Typography>
                     </Stack>
                   </Stack>
@@ -212,15 +482,28 @@ const TaskManagement = () => {
                   <Divider />
 
                   <Stack direction="row" spacing={1}>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      fullWidth
-                      onClick={() => handleViewTask(task)}
-                      startIcon={<MapPin size={16} />}
-                    >
-                      View Details
-                    </Button>
+                    {task.status === 'available' ? (
+                      <Button
+                        variant="contained"
+                        size="small"
+                        fullWidth
+                        onClick={() => handleAcceptTask(task)}
+                        startIcon={<CheckCircle size={16} />}
+                        disabled={assignIncidentMutation.isPending}
+                      >
+                        Accept Task
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="contained"
+                        size="small"
+                        fullWidth
+                        onClick={() => handleViewTask(task)}
+                        startIcon={<MapPin size={16} />}
+                      >
+                        View Details
+                      </Button>
+                    )}
                     {task.status === 'accepted' && (
                       <Button
                         variant="outlined"
@@ -229,6 +512,7 @@ const TaskManagement = () => {
                         onClick={() => handleCompleteTask(task.id)}
                         startIcon={<CheckCircle size={16} />}
                         color="success"
+                        disabled={updateIncidentMutation.isPending}
                       >
                         Complete
                       </Button>
@@ -237,9 +521,9 @@ const TaskManagement = () => {
                 </Stack>
               </CardContent>
             </Card>
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
 
       {/* Task Details Dialog */}
       <Dialog
@@ -262,9 +546,9 @@ const TaskManagement = () => {
                 <Typography variant="h5" fontWeight={700}>
                   {selectedTask.title}
                 </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                   <Chip
-                    label={selectedTask.status.replace('-', ' ')}
+                    label={getStatusLabel(selectedTask.status)}
                     color={getStatusColor(selectedTask.status)}
                     size="small"
                     sx={{ textTransform: 'capitalize' }}
@@ -287,9 +571,17 @@ const TaskManagement = () => {
                       color={getPriorityColor(selectedTask.priority)}
                       textTransform="capitalize"
                     >
-                      {selectedTask.priority} Priority
+                      {getPriorityLabel(selectedTask.priority)} Priority
                     </Typography>
                   </Box>
+                  {selectedTask.category && (
+                    <Chip
+                      label={selectedTask.category}
+                      size="small"
+                      variant="outlined"
+                      sx={{ textTransform: 'capitalize' }}
+                    />
+                  )}
                 </Stack>
               </Stack>
             </DialogTitle>
@@ -306,18 +598,20 @@ const TaskManagement = () => {
                       <strong>Assigned:</strong> {format(selectedTask.assignedDate, 'MMM dd, yyyy HH:mm')}
                     </Typography>
                   </Stack>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Clock size={18} color={theme.palette.text.secondary} />
-                    <Typography variant="body2">
-                      <strong>Due Date:</strong> {format(selectedTask.dueDate, 'MMM dd, yyyy')}
-                    </Typography>
-                  </Stack>
                   <Stack direction="row" spacing={1} alignItems="start">
                     <MapPin size={18} color={theme.palette.text.secondary} />
                     <Typography variant="body2">
                       <strong>Location:</strong> {selectedTask.location.address}
                     </Typography>
                   </Stack>
+                  {selectedTask.reporterName && (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="body2">
+                        <strong>Reporter:</strong> {selectedTask.reporterName}
+                        {selectedTask.reporterContact && ` (${selectedTask.reporterContact})`}
+                      </Typography>
+                    </Stack>
+                  )}
                 </Stack>
 
                 <Divider />
@@ -352,21 +646,23 @@ const TaskManagement = () => {
               </Stack>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3 }}>
-              {selectedTask.status === 'pending' && (
+              {(selectedTask.status === 'pending' || selectedTask.status === 'available') && (
                 <>
                   <Button
                     onClick={() => handleDeclineTask(selectedTask.id)}
                     startIcon={<XCircle size={18} />}
                     color="error"
+                    disabled={updateIncidentMutation.isPending || assignIncidentMutation.isPending}
                   >
                     Decline
                   </Button>
                   <Button
-                    onClick={() => handleAcceptTask(selectedTask.id)}
+                    onClick={() => handleAcceptTask(selectedTask)}
                     variant="contained"
                     startIcon={<CheckCircle size={18} />}
+                    disabled={updateIncidentMutation.isPending || assignIncidentMutation.isPending}
                   >
-                    Accept Task
+                    {(updateIncidentMutation.isPending || assignIncidentMutation.isPending) ? 'Accepting...' : 'Accept Task'}
                   </Button>
                 </>
               )}
@@ -376,8 +672,9 @@ const TaskManagement = () => {
                   variant="contained"
                   startIcon={<CheckCircle size={18} />}
                   color="success"
+                  disabled={updateIncidentMutation.isPending}
                 >
-                  Mark as Complete
+                  {updateIncidentMutation.isPending ? 'Completing...' : 'Mark as Complete'}
                 </Button>
               )}
               {selectedTask.status === 'completed' && (

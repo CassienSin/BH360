@@ -99,8 +99,11 @@ const AdminIncidentTable = () => {
     const colors = {
       crime: theme.palette.error.main,
       noise: theme.palette.warning.main,
+      fire: theme.palette.error.main,
       hazard: theme.palette.info.main,
       dispute: theme.palette.secondary.main,
+      health: theme.palette.error.main,
+      utility: theme.palette.info.main,
       other: theme.palette.grey[500],
     };
     return colors[category?.toLowerCase()] || theme.palette.grey[500];
@@ -465,8 +468,12 @@ const AdminIncidentTable = () => {
             <MenuItem value="all">All Categories</MenuItem>
             <MenuItem value="crime">Crime</MenuItem>
             <MenuItem value="noise">Noise</MenuItem>
+            <MenuItem value="fire">Fire</MenuItem>
             <MenuItem value="hazard">Hazard</MenuItem>
             <MenuItem value="dispute">Dispute</MenuItem>
+            <MenuItem value="health">Health</MenuItem>
+            <MenuItem value="utility">Utility</MenuItem>
+            <MenuItem value="other">Other</MenuItem>
           </Select>
         </FormControl>
         <FormControl sx={{ minWidth: 140 }}>

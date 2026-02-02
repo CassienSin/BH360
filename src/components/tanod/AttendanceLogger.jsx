@@ -214,8 +214,8 @@ const AttendanceLogger = () => {
         </Stack>
 
         {/* Stats Cards */}
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Stack direction="row" spacing={2} flexWrap="wrap">
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
             <Card
               elevation={0}
               sx={{
@@ -235,8 +235,8 @@ const AttendanceLogger = () => {
                 </Stack>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          </Box>
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
             <Card
               elevation={0}
               sx={{
@@ -256,8 +256,8 @@ const AttendanceLogger = () => {
                 </Stack>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          </Box>
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
             <Card
               elevation={0}
               sx={{
@@ -277,8 +277,8 @@ const AttendanceLogger = () => {
                 </Stack>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          </Box>
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
             <Card
               elevation={0}
               sx={{
@@ -298,8 +298,8 @@ const AttendanceLogger = () => {
                 </Stack>
               </CardContent>
             </Card>
-          </Grid>
-        </Grid>
+          </Box>
+        </Stack>
 
         {/* Clock In/Out Card */}
         <Card
@@ -311,8 +311,8 @@ const AttendanceLogger = () => {
           }}
         >
           <CardContent>
-            <Grid container spacing={3} alignItems="center">
-              <Grid size={{ xs: 12, md: 6 }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="center">
+              <Box sx={{ flex: 1, width: '100%' }}>
                 <FormControl fullWidth>
                   <InputLabel>Select Tanod Member</InputLabel>
                   <Select
@@ -328,8 +328,8 @@ const AttendanceLogger = () => {
                     ))}
                   </Select>
                 </FormControl>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              </Box>
+              <Box sx={{ flex: 1, width: '100%' }}>
                 <Stack direction="row" spacing={2}>
                   <Button
                     fullWidth
@@ -352,8 +352,8 @@ const AttendanceLogger = () => {
                     Clock Out
                   </Button>
                 </Stack>
-              </Grid>
-            </Grid>
+              </Box>
+            </Stack>
           </CardContent>
         </Card>
 
