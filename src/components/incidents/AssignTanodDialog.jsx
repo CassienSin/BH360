@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -17,13 +17,16 @@ import {
   FormControlLabel,
   CircularProgress,
   Alert,
+  AlertTitle,
   alpha,
   useTheme,
+  Divider,
 } from '@mui/material';
-import { Search, User, MapPin, Clock, Award } from 'lucide-react';
+import { Search, User, MapPin, Clock, Award, Sparkles, TrendingUp, CheckCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAllTanods } from '../../hooks/useTanod';
 import { useAssignIncident } from '../../hooks/useIncidents';
+import { suggestTanodAssignment } from '../../services/aiService';
 
 const AssignTanodDialog = ({ open, onClose, incident }) => {
   const theme = useTheme();
@@ -35,6 +38,43 @@ const AssignTanodDialog = ({ open, onClose, incident }) => {
   
   // Mutation for assigning incident
   const assignIncidentMutation = useAssignIncident();
+
+  // AI-powered tanod suggestions
+  const [aiSuggestions, setAiSuggestions] = useState(null);
+
+  useEffect(() => {
+    if (incident && tanods.length > 0) {
+      try {
+        const suggestions = suggestTanodAssignment(incident, tanods, {});
+        setAiSuggestions(suggestions);
+        
+        // Auto-select top recommendation if no tanod is currently assigned
+        if (!incident.assignedTo && suggestions.recommendations?.length > 0) {
+          setSelectedTanodId(suggestions.recommendations[0].tanod.id);
+        }
+      } catch (error) {
+        console.error('Error getting AI suggestions:', error);
+      }
+    }
+  }, [incident, tanods]);
+
+  // Get AI recommendation rank for a tanod
+  const getTanodRecommendationRank = (tanodId) => {
+    if (!aiSuggestions?.recommendations) return null;
+    const index = aiSuggestions.recommendations.findIndex(
+      (rec) => rec.tanod.id === tanodId
+    );
+    return index >= 0 ? index + 1 : null;
+  };
+
+  // Get AI match reason for a tanod
+  const getTanodMatchReason = (tanodId) => {
+    if (!aiSuggestions?.recommendations) return null;
+    const recommendation = aiSuggestions.recommendations.find(
+      (rec) => rec.tanod.id === tanodId
+    );
+    return recommendation?.matchReason || null;
+  };
 
   // Filter tanods based on search
   const filteredTanods = useMemo(() => {
@@ -57,10 +97,28 @@ const AssignTanodDialog = ({ open, onClose, incident }) => {
     });
   }, [tanods, searchQuery]);
 
-  // Filter only active tanods
+  // Filter only active tanods and sort by AI recommendation
   const activeTanods = useMemo(() => {
-    return filteredTanods.filter((tanod) => tanod.status === 'active');
-  }, [filteredTanods]);
+    const active = filteredTanods.filter((tanod) => tanod.status === 'active');
+    
+    // Sort by AI recommendation (recommended first)
+    if (aiSuggestions?.recommendations) {
+      return active.sort((a, b) => {
+        const rankA = getTanodRecommendationRank(a.id);
+        const rankB = getTanodRecommendationRank(b.id);
+        
+        // Recommended tanods first, sorted by rank
+        if (rankA && !rankB) return -1;
+        if (!rankA && rankB) return 1;
+        if (rankA && rankB) return rankA - rankB;
+        
+        // Non-recommended tanods after
+        return 0;
+      });
+    }
+    
+    return active;
+  }, [filteredTanods, aiSuggestions]);
 
   const handleAssign = async () => {
     if (!selectedTanodId) {
@@ -107,6 +165,30 @@ const AssignTanodDialog = ({ open, onClose, incident }) => {
       
       <DialogContent>
         <Stack spacing={3}>
+          {/* AI Insights Banner */}
+          {aiSuggestions?.topChoice && (
+            <Alert
+              severity="success"
+              icon={<Sparkles size={20} />}
+              sx={{
+                borderRadius: 2,
+                backgroundColor: alpha(theme.palette.success.main, 0.08),
+                border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+              }}
+            >
+              <AlertTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TrendingUp size={16} />
+                AI Recommendation
+              </AlertTitle>
+              <Typography variant="body2">
+                <strong>{aiSuggestions.topChoice.tanod.displayName || aiSuggestions.topChoice.tanod.firstName}</strong> is the best match ({aiSuggestions.topChoice.confidence}% confidence)
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                {aiSuggestions.topChoice.matchReason}
+              </Typography>
+            </Alert>
+          )}
+
           {/* Search Field */}
           <TextField
             placeholder="Search by name, area, or status..."
@@ -146,61 +228,87 @@ const AssignTanodDialog = ({ open, onClose, incident }) => {
               ) : (
                 <RadioGroup value={selectedTanodId} onChange={(e) => setSelectedTanodId(e.target.value)}>
                   <Stack spacing={1}>
-                    {activeTanods.map((tanod) => (
-                      <Box
-                        key={tanod.id}
-                        sx={{
-                          border: `2px solid ${
-                            selectedTanodId === tanod.id
-                              ? theme.palette.primary.main
-                              : theme.palette.divider
-                          }`,
-                          borderRadius: 2,
-                          p: 2,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          backgroundColor:
-                            selectedTanodId === tanod.id
-                              ? alpha(theme.palette.primary.main, 0.05)
-                              : 'transparent',
-                          '&:hover': {
-                            borderColor: theme.palette.primary.main,
-                            backgroundColor: alpha(theme.palette.primary.main, 0.03),
-                          },
-                        }}
-                        onClick={() => setSelectedTanodId(tanod.id)}
-                      >
-                        <FormControlLabel
-                          value={tanod.id}
-                          control={<Radio />}
-                          sx={{ width: '100%', m: 0 }}
-                          label={
-                            <Stack direction="row" spacing={2} alignItems="center" flexGrow={1}>
-                              <Avatar
-                                src={tanod.photoURL}
-                                alt={tanod.displayName || tanod.firstName}
-                                sx={{ width: 48, height: 48 }}
-                              >
-                                {(tanod.displayName || tanod.firstName || 'T')[0].toUpperCase()}
-                              </Avatar>
-                              
-                              <Stack spacing={0.5} flexGrow={1}>
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <Typography variant="subtitle2" fontWeight={600}>
-                                    {tanod.displayName || `${tanod.firstName || ''} ${tanod.lastName || ''}`.trim() || 'Tanod Member'}
-                                  </Typography>
-                                  <Chip
-                                    label={tanod.status || 'active'}
-                                    size="small"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: '0.65rem',
-                                      backgroundColor: alpha(getStatusColor(tanod.status), 0.1),
-                                      color: getStatusColor(tanod.status),
-                                      textTransform: 'capitalize',
-                                    }}
-                                  />
-                                </Stack>
+                    {activeTanods.map((tanod) => {
+                      const recommendationRank = getTanodRecommendationRank(tanod.id);
+                      const matchReason = getTanodMatchReason(tanod.id);
+                      const isTopRecommendation = recommendationRank === 1;
+                      
+                      return (
+                        <Box
+                          key={tanod.id}
+                          sx={{
+                            border: `2px solid ${
+                              selectedTanodId === tanod.id
+                                ? theme.palette.primary.main
+                                : isTopRecommendation
+                                ? alpha(theme.palette.success.main, 0.5)
+                                : theme.palette.divider
+                            }`,
+                            borderRadius: 2,
+                            p: 2,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            backgroundColor:
+                              selectedTanodId === tanod.id
+                                ? alpha(theme.palette.primary.main, 0.05)
+                                : isTopRecommendation
+                                ? alpha(theme.palette.success.main, 0.03)
+                                : 'transparent',
+                            '&:hover': {
+                              borderColor: theme.palette.primary.main,
+                              backgroundColor: alpha(theme.palette.primary.main, 0.03),
+                            },
+                          }}
+                          onClick={() => setSelectedTanodId(tanod.id)}
+                        >
+                          <FormControlLabel
+                            value={tanod.id}
+                            control={<Radio />}
+                            sx={{ width: '100%', m: 0 }}
+                            label={
+                              <Stack direction="row" spacing={2} alignItems="center" flexGrow={1}>
+                                <Avatar
+                                  src={tanod.photoURL}
+                                  alt={tanod.displayName || tanod.firstName}
+                                  sx={{ width: 48, height: 48 }}
+                                >
+                                  {(tanod.displayName || tanod.firstName || 'T')[0].toUpperCase()}
+                                </Avatar>
+                                
+                                <Stack spacing={0.5} flexGrow={1}>
+                                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                    <Typography variant="subtitle2" fontWeight={600}>
+                                      {tanod.displayName || `${tanod.firstName || ''} ${tanod.lastName || ''}`.trim() || 'Tanod Member'}
+                                    </Typography>
+                                    <Chip
+                                      label={tanod.status || 'active'}
+                                      size="small"
+                                      sx={{
+                                        height: 20,
+                                        fontSize: '0.65rem',
+                                        backgroundColor: alpha(getStatusColor(tanod.status), 0.1),
+                                        color: getStatusColor(tanod.status),
+                                        textTransform: 'capitalize',
+                                      }}
+                                    />
+                                    {recommendationRank && (
+                                      <Chip
+                                        icon={isTopRecommendation ? <CheckCircle size={12} /> : <TrendingUp size={12} />}
+                                        label={isTopRecommendation ? 'Best Match' : `Rank #${recommendationRank}`}
+                                        size="small"
+                                        sx={{
+                                          height: 20,
+                                          fontSize: '0.65rem',
+                                          backgroundColor: alpha(
+                                            isTopRecommendation ? theme.palette.success.main : theme.palette.info.main,
+                                            0.1
+                                          ),
+                                          color: isTopRecommendation ? theme.palette.success.main : theme.palette.info.main,
+                                          fontWeight: 600,
+                                        }}
+                                      />
+                                    )}
+                                  </Stack>
                                 
                                 <Stack direction="row" spacing={2} flexWrap="wrap">
                                   {tanod.currentShift && (
@@ -237,12 +345,25 @@ const AssignTanodDialog = ({ open, onClose, incident }) => {
                                     {tanod.totalIncidentsResponded} incidents handled
                                   </Typography>
                                 )}
+                                
+                                {matchReason && (
+                                  <>
+                                    <Divider sx={{ my: 0.5 }} />
+                                    <Stack direction="row" spacing={0.5} alignItems="center">
+                                      <Sparkles size={12} color={theme.palette.success.main} />
+                                      <Typography variant="caption" color="success.main" fontWeight={500}>
+                                        {matchReason}
+                                      </Typography>
+                                    </Stack>
+                                  </>
+                                )}
                               </Stack>
                             </Stack>
                           }
                         />
                       </Box>
-                    ))}
+                    );
+                  })}
                   </Stack>
                 </RadioGroup>
               )}

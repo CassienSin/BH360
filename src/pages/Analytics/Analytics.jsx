@@ -177,16 +177,6 @@ const Analytics = () => {
                   Analyzing {incidents.length} incidents • {trendData.resolutionRate}% resolution rate
                 </Typography>
               </Stack>
-              <Chip
-                label="ENHANCED AI v2.0"
-                size="small"
-                sx={{
-                  backgroundColor: alpha(theme.palette.primary.main, 0.15),
-                  color: theme.palette.primary.main,
-                  fontWeight: 700,
-                  fontSize: '0.7rem'
-                }}
-              />
             </Stack>
             <AIInsightsPanel insights={trendData.insights} />
           </CardContent>
