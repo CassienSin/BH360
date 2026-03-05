@@ -1,15 +1,22 @@
-import { Stack, Typography, Card, CardContent, Avatar, Button, Grid, TextField, Divider } from '@mui/material';
+import { useEffect } from 'react';
+import { Stack, Typography, Card, CardContent, Avatar, Button, Box, TextField, Divider } from '@mui/material';
 import { User, Camera, Save } from 'lucide-react';
 import { useAppSelector } from '../../store/hooks';
 
 const Profile = () => {
   const { user } = useAppSelector((state) => state.auth);
 
+  // Issue #23: Update document title
+  useEffect(() => {
+    document.title = 'Profile – BH360';
+  }, []);
+
   return (
     <Stack spacing={3}>
       <Stack spacing={1}>
-        <Typography variant="h4" fontWeight={700}>
-          Profile Settings
+        {/* Issue #6, #13: h1 component + gradient text */}
+        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
+          My Profile
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Manage your account information

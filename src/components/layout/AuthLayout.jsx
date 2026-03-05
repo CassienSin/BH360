@@ -10,7 +10,8 @@ const AuthLayout = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #3457D5 0%, #4682b4 100%)',
+        // Issue #15: Aligned with $primary-color (#6366F1) from SCSS / theme.palette.primary
+        background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
         py: 4,
       }}
     >

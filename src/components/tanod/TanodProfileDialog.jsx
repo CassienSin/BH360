@@ -7,27 +7,27 @@ import {
   Button,
   TextField,
   Stack,
-  Grid,
   Typography,
   Divider,
   Avatar,
   IconButton,
   Chip,
   Autocomplete,
+  CircularProgress,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
-import { X, Upload, Shield, Plus } from 'lucide-react';
+import { X, Shield, Plus } from 'lucide-react';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { useDispatch } from 'react-redux';
-import { addTanodMember, updateTanodMember } from '../../store/slices/tanodSlice';
 import { toast } from 'react-toastify';
+import { useCreateTanodProfile, useUpdateTanodProfile } from '../../hooks/useTanod';
 
 const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
-  const theme = useTheme();
-  const dispatch = useDispatch();
   const isEdit = Boolean(tanod);
+
+  const createProfile = useCreateTanodProfile();
+  const updateProfile = useUpdateTanodProfile();
+  const isSaving = createProfile.isPending || updateProfile.isPending;
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -98,21 +98,20 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
     }));
   };
 
-  const handleSubmit = () => {
-    // Validation
+  const handleSubmit = async () => {
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
       toast.error('Please fill in all required fields');
       return;
     }
 
     const tanodData = {
-      id: isEdit ? tanod.id : `tanod-${Date.now()}`,
       firstName: formData.firstName,
       lastName: formData.lastName,
+      displayName: `${formData.firstName} ${formData.lastName}`,
       fullName: `${formData.firstName} ${formData.lastName}`,
       email: formData.email,
       phone: formData.phone,
-      dateOfBirth: formData.dateOfBirth,
+      dateOfBirth: formData.dateOfBirth ? formData.dateOfBirth.toISOString() : null,
       address: formData.address,
       emergencyContact: {
         name: formData.emergencyContactName,
@@ -121,49 +120,42 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
       },
       qualifications: formData.qualifications,
       status: formData.status,
-      currentShift: isEdit ? tanod.currentShift : 'off',
-      assignedAreas: isEdit ? tanod.assignedAreas : [],
-      dateJoined: isEdit ? tanod.dateJoined : new Date(),
-      rating: isEdit ? tanod.rating : 0,
-      totalIncidentsResponded: isEdit ? tanod.totalIncidentsResponded : 0,
-      totalDutyHours: isEdit ? tanod.totalDutyHours : 0,
-      photo: isEdit ? tanod.photo : null,
+      role: 'tanod',
     };
 
-    if (isEdit) {
-      dispatch(updateTanodMember(tanodData));
-      toast.success('Tanod profile updated successfully');
-    } else {
-      dispatch(addTanodMember(tanodData));
-      toast.success('Tanod member added successfully');
+    try {
+      if (isEdit) {
+        await updateProfile.mutateAsync({ tanodId: tanod.id, updates: tanodData });
+      } else {
+        await createProfile.mutateAsync({
+          ...tanodData,
+          currentShift: 'off',
+          assignedAreas: [],
+          dateJoined: new Date().toISOString(),
+          rating: 0,
+          totalIncidentsResponded: 0,
+          totalDutyHours: 0,
+        });
+      }
+      onClose();
+    } catch (err) {
+      console.error('[TanodProfileDialog] submit error:', err);
     }
-
-    onClose();
   };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Dialog
         open={open}
-        onClose={onClose}
+        onClose={isSaving ? undefined : onClose}
         maxWidth="md"
         fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: 3 } }}
       >
         <DialogTitle>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar
-                sx={{
-                  width: 48,
-                  height: 48,
-                  bgcolor: 'primary.main',
-                }}
-              >
+              <Avatar sx={{ width: 48, height: 48, bgcolor: 'primary.main' }}>
                 <Shield size={24} />
               </Avatar>
               <Stack>
@@ -171,11 +163,13 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
                   {isEdit ? 'Edit Tanod Profile' : 'Add New Tanod'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {isEdit ? 'Update tanod member information' : 'Fill in the details to add a new tanod member'}
+                  {isEdit
+                    ? 'Update tanod member information'
+                    : 'Fill in the details to add a new tanod member'}
                 </Typography>
               </Stack>
             </Stack>
-            <IconButton onClick={onClose}>
+            <IconButton onClick={onClose} disabled={isSaving}>
               <X size={20} />
             </IconButton>
           </Stack>
@@ -185,111 +179,99 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
           <Stack spacing={3} sx={{ mt: 1 }}>
             {/* Personal Information */}
             <Stack spacing={2}>
-              <Typography variant="h6" fontWeight={600}>
-                Personal Information
-              </Typography>
-              <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
-                    fullWidth
-                    label="First Name"
-                    value={formData.firstName}
-                    onChange={(e) => handleChange('firstName', e.target.value)}
-                    required
-                  />
-                  <TextField
-                    fullWidth
-                    label="Last Name"
-                    value={formData.lastName}
-                    onChange={(e) => handleChange('lastName', e.target.value)}
-                    required
-                  />
-                </Stack>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
-                    fullWidth
-                    label="Email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleChange('email', e.target.value)}
-                    required
-                  />
-                  <TextField
-                    fullWidth
-                    label="Phone Number"
-                    value={formData.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
-                    required
-                    placeholder="+63 912 345 6789"
-                  />
-                </Stack>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <DatePicker
-                    label="Date of Birth"
-                    value={formData.dateOfBirth}
-                    onChange={(date) => handleChange('dateOfBirth', date)}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                      },
-                    }}
-                  />
-                  <Autocomplete
-                    fullWidth
-                    options={['active', 'inactive', 'on-leave']}
-                    value={formData.status}
-                    onChange={(e, value) => handleChange('status', value || 'active')}
-                    renderInput={(params) => <TextField {...params} label="Status" />}
-                    getOptionLabel={(option) =>
-                      option
-                        .split('-')
-                        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                        .join(' ')
-                    }
-                  />
-                </Stack>
+              <Typography variant="h6" fontWeight={600}>Personal Information</Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
                   fullWidth
-                  label="Address"
-                  value={formData.address}
-                  onChange={(e) => handleChange('address', e.target.value)}
-                  multiline
-                  rows={2}
+                  label="First Name"
+                  value={formData.firstName}
+                  onChange={(e) => handleChange('firstName', e.target.value)}
+                  required
+                />
+                <TextField
+                  fullWidth
+                  label="Last Name"
+                  value={formData.lastName}
+                  onChange={(e) => handleChange('lastName', e.target.value)}
+                  required
                 />
               </Stack>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  required
+                />
+                <TextField
+                  fullWidth
+                  label="Phone Number"
+                  value={formData.phone}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  required
+                  placeholder="+63 912 345 6789"
+                />
+              </Stack>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <DatePicker
+                  label="Date of Birth"
+                  value={formData.dateOfBirth}
+                  onChange={(date) => handleChange('dateOfBirth', date)}
+                  slotProps={{ textField: { fullWidth: true } }}
+                />
+                <Autocomplete
+                  fullWidth
+                  options={['active', 'inactive', 'on-leave']}
+                  value={formData.status}
+                  onChange={(e, value) => handleChange('status', value || 'active')}
+                  renderInput={(params) => <TextField {...params} label="Status" />}
+                  getOptionLabel={(option) =>
+                    option
+                      .split('-')
+                      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                      .join(' ')
+                  }
+                />
+              </Stack>
+              <TextField
+                fullWidth
+                label="Address"
+                value={formData.address}
+                onChange={(e) => handleChange('address', e.target.value)}
+                multiline
+                rows={2}
+              />
             </Stack>
 
             <Divider />
 
             {/* Emergency Contact */}
             <Stack spacing={2}>
-              <Typography variant="h6" fontWeight={600}>
-                Emergency Contact
-              </Typography>
-              <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
-                    fullWidth
-                    label="Contact Name"
-                    value={formData.emergencyContactName}
-                    onChange={(e) => handleChange('emergencyContactName', e.target.value)}
-                  />
-                  <TextField
-                    fullWidth
-                    label="Relationship"
-                    value={formData.emergencyContactRelationship}
-                    onChange={(e) => handleChange('emergencyContactRelationship', e.target.value)}
-                    placeholder="e.g., Spouse, Parent, Sibling"
-                  />
-                </Stack>
+              <Typography variant="h6" fontWeight={600}>Emergency Contact</Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
                   fullWidth
-                  label="Contact Phone"
-                  value={formData.emergencyContactPhone}
-                  onChange={(e) => handleChange('emergencyContactPhone', e.target.value)}
-                  placeholder="+63 912 345 6789"
+                  label="Contact Name"
+                  value={formData.emergencyContactName}
+                  onChange={(e) => handleChange('emergencyContactName', e.target.value)}
+                />
+                <TextField
+                  fullWidth
+                  label="Relationship"
+                  value={formData.emergencyContactRelationship}
+                  onChange={(e) => handleChange('emergencyContactRelationship', e.target.value)}
+                  placeholder="e.g., Spouse, Parent, Sibling"
                 />
               </Stack>
+              <TextField
+                fullWidth
+                label="Contact Phone"
+                value={formData.emergencyContactPhone}
+                onChange={(e) => handleChange('emergencyContactPhone', e.target.value)}
+                placeholder="+63 912 345 6789"
+              />
             </Stack>
 
             <Divider />
@@ -340,11 +322,16 @@ const TanodProfileDialog = ({ open, onClose, tanod = null }) => {
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={onClose} variant="outlined">
+          <Button onClick={onClose} variant="outlined" disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} variant="contained">
-            {isEdit ? 'Update Profile' : 'Add Tanod'}
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={isSaving}
+            startIcon={isSaving ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            {isSaving ? 'Saving…' : isEdit ? 'Update Profile' : 'Add Tanod'}
           </Button>
         </DialogActions>
       </Dialog>

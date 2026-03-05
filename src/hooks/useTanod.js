@@ -19,6 +19,10 @@ import {
   updateSchedule,
   deleteSchedule,
   getTanodPerformance,
+  createTanodProfile,
+  updateTanodProfile,
+  getAllPatrolAreas,
+  updatePatrolAreaById,
 } from '../services/tanodService';
 
 // Query keys
@@ -31,6 +35,7 @@ const QUERY_KEYS = {
   SCHEDULES: (id) => ['schedules', id],
   ALL_SCHEDULES: ['schedules'],
   PERFORMANCE: (id) => ['tanods', 'performance', id],
+  PATROL_AREAS: ['patrolAreas'],
 };
 
 /**
@@ -160,7 +165,8 @@ export const useRecordAttendance = () => {
   return useMutation({
     mutationFn: recordAttendance,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL_ATTENDANCE });
+      // Invalidate all attendance caches (all-list and per-tanod)
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
       toast.success('Attendance recorded');
     },
     onError: (error) => {
@@ -179,7 +185,8 @@ export const useCheckoutAttendance = () => {
   return useMutation({
     mutationFn: ({ attendanceId, checkOutTime }) => checkoutAttendance(attendanceId, checkOutTime),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL_ATTENDANCE });
+      // Invalidate all attendance caches (all-list and per-tanod)
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
       toast.success('Checkout recorded');
     },
     onError: (error) => {
@@ -246,6 +253,72 @@ export const useDeleteSchedule = () => {
   });
 };
 
+/**
+ * Hook to fetch all patrol areas
+ */
+export const useAllPatrolAreas = (options = {}) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.PATROL_AREAS,
+    queryFn: getAllPatrolAreas,
+    staleTime: 60000,
+    ...options,
+  });
+};
+
+/**
+ * Hook to update a patrol area (assign/unassign tanods)
+ */
+export const useUpdatePatrolArea = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ areaId, updates }) => updatePatrolAreaById(areaId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PATROL_AREAS });
+      toast.success('Patrol area updated');
+    },
+    onError: (error) => {
+      console.error('Error updating patrol area:', error);
+      toast.error('Failed to update patrol area');
+    },
+  });
+};
+
+/**
+ * Hook to create a tanod profile
+ */
+export const useCreateTanodProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createTanodProfile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL });
+      toast.success('Tanod profile created successfully');
+    },
+    onError: (error) => {
+      console.error('Error creating tanod profile:', error);
+      toast.error('Failed to create tanod profile');
+    },
+  });
+};
+
+/**
+ * Hook to update a tanod profile
+ */
+export const useUpdateTanodProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tanodId, updates }) => updateTanodProfile(tanodId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL });
+      toast.success('Tanod profile updated successfully');
+    },
+    onError: (error) => {
+      console.error('Error updating tanod profile:', error);
+      toast.error('Failed to update tanod profile');
+    },
+  });
+};
+
 export default {
   useAllTanods,
   useTanod,
@@ -261,4 +334,8 @@ export default {
   useCreateSchedule,
   useUpdateSchedule,
   useDeleteSchedule,
+  useAllPatrolAreas,
+  useUpdatePatrolArea,
+  useCreateTanodProfile,
+  useUpdateTanodProfile,
 };

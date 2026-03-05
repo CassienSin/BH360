@@ -13,45 +13,48 @@ import {
   Box,
   Typography,
   alpha,
+  CircularProgress,
 } from '@mui/material';
 import { X, Bell, AlertTriangle, Info } from 'lucide-react';
-import { useAppDispatch } from '../../store/hooks';
-import { addAnnouncement } from '../../store/slices/announcementSlice';
-import { toast } from 'react-toastify';
+import { useAppSelector } from '../../store/hooks';
+import { useCreateAnnouncement } from '../../hooks/useAnnouncements';
 
 const CreateAnnouncementDialog = ({ open, onClose }) => {
   const theme = useTheme();
-  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+  const createAnnouncementMutation = useCreateAnnouncement();
+
   const [formData, setFormData] = useState({
     title: '',
     message: '',
     type: 'info',
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.title.trim() || !formData.message.trim()) {
-      toast.error('Please fill in all required fields');
       return;
     }
 
-    dispatch(
-      addAnnouncement({
-        title: formData.title,
-        message: formData.message,
-        type: formData.type,
-        date: new Date(),
-        createdBy: 'Admin',
-      })
-    );
+    await createAnnouncementMutation.mutateAsync({
+      title: formData.title.trim(),
+      message: formData.message.trim(),
+      type: formData.type,
+      status: 'published',
+      // Issue #10: Prefer firstName + lastName over raw email for poster identity
+      createdBy: user?.firstName
+        ? `${user.firstName} ${user.lastName}`.trim()
+        : user?.displayName || 'Admin',
+      createdById: user?.uid || null,
+    });
 
-    toast.success('Announcement created successfully!');
     setFormData({ title: '', message: '', type: 'info' });
     onClose();
   };
 
   const handleClose = () => {
+    if (createAnnouncementMutation.isPending) return;
     setFormData({ title: '', message: '', type: 'info' });
     onClose();
   };
@@ -79,6 +82,8 @@ const CreateAnnouncementDialog = ({ open, onClose }) => {
         return theme.palette.info.main;
     }
   };
+
+  const isPending = createAnnouncementMutation.isPending;
 
   return (
     <Dialog
@@ -110,7 +115,7 @@ const CreateAnnouncementDialog = ({ open, onClose }) => {
               Create Announcement
             </Typography>
           </Stack>
-          <IconButton onClick={handleClose} size="small">
+          <IconButton onClick={handleClose} size="small" disabled={isPending}>
             <X size={20} />
           </IconButton>
         </Stack>
@@ -126,17 +131,17 @@ const CreateAnnouncementDialog = ({ open, onClose }) => {
               required
               fullWidth
               placeholder="e.g., Community Event, Important Notice"
+              disabled={isPending}
             />
 
             <TextField
               select
               label="Type"
               value={formData.type}
-              onChange={(e) =>
-                setFormData({ ...formData, type: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
               required
               fullWidth
+              disabled={isPending}
             >
               <MenuItem value="info">
                 <Stack direction="row" alignItems="center" spacing={1}>
@@ -167,8 +172,10 @@ const CreateAnnouncementDialog = ({ open, onClose }) => {
               multiline
               rows={4}
               placeholder="Provide detailed information about the announcement..."
+              disabled={isPending}
             />
 
+            {/* Live Preview */}
             <Box
               sx={{
                 p: 2,
@@ -183,7 +190,7 @@ const CreateAnnouncementDialog = ({ open, onClose }) => {
                   <Typography variant="subtitle2" fontWeight={600}>
                     Preview
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color={formData.title ? 'text.primary' : 'text.secondary'}>
                     {formData.title || 'Your announcement title will appear here'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
@@ -196,11 +203,16 @@ const CreateAnnouncementDialog = ({ open, onClose }) => {
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={handleClose} variant="outlined">
+          <Button onClick={handleClose} variant="outlined" disabled={isPending}>
             Cancel
           </Button>
-          <Button type="submit" variant="contained">
-            Create Announcement
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={isPending || !formData.title.trim() || !formData.message.trim()}
+            startIcon={isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
+          >
+            {isPending ? 'Publishing...' : 'Publish Announcement'}
           </Button>
         </DialogActions>
       </form>

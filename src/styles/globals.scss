@@ -1,7 +1,5 @@
 // Global styles for BH360 Barangay Management System
-
-// Import Inter font from Google Fonts
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+// NOTE: Inter font is loaded non-blocking via <link> in index.html — no @import here.
 
 // Design tokens
 $primary-color: #6366F1;
@@ -147,7 +145,8 @@ body {
 
   &.submitted {
     background-color: #E3F2FD;
-    color: #1976D2;
+    // Darkened from #1976D2 to meet WCAG AA contrast ≥ 4.5:1 (issue #4)
+    color: #1558A8;
   }
 
   &.in-progress {

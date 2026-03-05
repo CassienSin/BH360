@@ -249,7 +249,12 @@ export const getCurrentUserData = async () => {
 };
 
 /**
- * Subscribe to authentication state changes
+ * Subscribe to authentication state changes.
+ *
+ * Auto-promotion: if VITE_ADMIN_EMAIL is set in .env and the signed-in user's
+ * email matches, their Firestore document is updated to role:'admin' so the
+ * correct role is persisted permanently (one-time self-healing write).
+ *
  * @param {Function} callback - Callback function
  * @returns {Function} Unsubscribe function
  */
@@ -258,6 +263,26 @@ export const subscribeToAuthState = (callback) => {
     if (user) {
       try {
         const userData = await getDocument(COLLECTIONS.USERS, user.uid);
+
+        // ── Admin auto-promotion ─────────────────────────────────────────────
+        // If VITE_ADMIN_EMAIL is defined in .env and matches the current user,
+        // ensure their Firestore document has role:'admin'.
+        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+        if (
+          adminEmail &&
+          user.email === adminEmail &&
+          userData.role !== 'admin'
+        ) {
+          try {
+            await updateDocument(COLLECTIONS.USERS, user.uid, { role: 'admin' });
+            userData.role = 'admin';
+            console.log('✅ Admin role granted to', user.email);
+          } catch (err) {
+            console.warn('Could not promote user to admin:', err);
+          }
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         callback({
           uid: user.uid,
           email: user.email,
@@ -265,7 +290,7 @@ export const subscribeToAuthState = (callback) => {
           ...userData,
         });
       } catch (error) {
-        // User document doesn't exist
+        // Firestore document missing — return basic auth data (no role default)
         callback({
           uid: user.uid,
           email: user.email,

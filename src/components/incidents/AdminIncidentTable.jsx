@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Stack,
@@ -22,6 +22,7 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
+import ConfirmDialog from '../common/ConfirmDialog';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import {
   Search,
@@ -54,6 +55,15 @@ const AdminIncidentTable = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
+  // Issue #19: Replace window.confirm with ConfirmDialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [rowToDelete, setRowToDelete] = useState(null);
+
+  // Issue #23: Update document title
+  useEffect(() => {
+    document.title = 'Incidents – BH360';
+  }, []);
+
   // Fetch incidents from Firebase
   const { data: incidents = [], isLoading, error } = useAllIncidents();
   const updateIncident = useUpdateIncident();
@@ -84,14 +94,22 @@ const AdminIncidentTable = () => {
     }
   };
 
-  const handleDeleteIncident = async () => {
-    if (selectedRow && window.confirm('Are you sure you want to delete this incident?')) {
-      try {
-        await deleteIncident.mutateAsync(selectedRow.id);
-        handleMenuClose();
-      } catch (error) {
-        console.error('Failed to delete incident:', error);
-      }
+  const handleDeleteIncident = () => {
+    if (selectedRow) {
+      setRowToDelete(selectedRow);
+      setDeleteDialogOpen(true);
+      handleMenuClose();
+    }
+  };
+
+  const handleConfirmDeleteIncident = async () => {
+    try {
+      await deleteIncident.mutateAsync(rowToDelete.id);
+    } catch (error) {
+      console.error('Failed to delete incident:', error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setRowToDelete(null);
     }
   };
 
@@ -365,7 +383,8 @@ const AdminIncidentTable = () => {
       {/* Header */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
         <Stack spacing={1}>
-          <Typography variant="h4" fontWeight={700}>
+          {/* Issue #6, #13: h1 component + gradient text */}
+          <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
             Incident Management
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -531,6 +550,18 @@ const AdminIncidentTable = () => {
           }}
         />
       </Box>
+
+      {/* Issue #19: MUI ConfirmDialog instead of window.confirm */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => { setDeleteDialogOpen(false); setRowToDelete(null); }}
+        onConfirm={handleConfirmDeleteIncident}
+        title="Delete Incident"
+        message="Are you sure you want to delete this incident? This action cannot be undone."
+        confirmLabel="Delete"
+        confirmColor="error"
+        loading={deleteIncident.isPending}
+      />
 
       {/* Context Menu */}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>

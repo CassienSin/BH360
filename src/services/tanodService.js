@@ -15,6 +15,80 @@ import {
   getServerTimestamp,
 } from './firebaseService';
 
+// ─── Tanod profile (stored in users collection) ───────────────────────────────
+
+/**
+ * Create a new tanod profile in the users collection
+ */
+export const createTanodProfile = async (profileData) => {
+  return await createDocument(COLLECTIONS.USERS, { ...profileData, role: 'tanod' });
+};
+
+/**
+ * Update an existing tanod's profile in the users collection
+ */
+export const updateTanodProfile = async (tanodId, updates) => {
+  return await updateDocument(COLLECTIONS.USERS, tanodId, updates);
+};
+
+// ─── Patrol areas ──────────────────────────────────────────────────────────────
+
+/** Default patrol areas seeded when the collection is empty */
+// Firestore does not support nested arrays — coordinates stored as array of {lat, lng} objects
+const DEFAULT_PATROL_AREAS = [
+  {
+    name: 'Zone A – Poblacion',
+    priority: 'high',
+    coordinates: [
+      { lat: 14.5995, lng: 120.9842 }, { lat: 14.601, lng: 120.9842 },
+      { lat: 14.601, lng: 120.986 },   { lat: 14.5995, lng: 120.986 },
+    ],
+    assignedTanodIds: [],
+  },
+  {
+    name: 'Zone B – Riverside',
+    priority: 'medium',
+    coordinates: [
+      { lat: 14.597, lng: 120.982 }, { lat: 14.599, lng: 120.982 },
+      { lat: 14.599, lng: 120.984 }, { lat: 14.597, lng: 120.984 },
+    ],
+    assignedTanodIds: [],
+  },
+  {
+    name: 'Zone C – Market Area',
+    priority: 'low',
+    coordinates: [
+      { lat: 14.600, lng: 120.986 }, { lat: 14.602, lng: 120.986 },
+      { lat: 14.602, lng: 120.988 }, { lat: 14.600, lng: 120.988 },
+    ],
+    assignedTanodIds: [],
+  },
+];
+
+export const getAllPatrolAreas = async () => {
+  const areas = await getAllDocuments(COLLECTIONS.PATROL_AREAS);
+  if (areas.length === 0) {
+    // Seed defaults on first load
+    await Promise.all(
+      DEFAULT_PATROL_AREAS.map((area) => createDocument(COLLECTIONS.PATROL_AREAS, area))
+    );
+    return await getAllDocuments(COLLECTIONS.PATROL_AREAS);
+  }
+  return areas;
+};
+
+export const createPatrolArea = async (areaData) => {
+  return await createDocument(COLLECTIONS.PATROL_AREAS, areaData);
+};
+
+export const updatePatrolAreaById = async (areaId, updates) => {
+  return await updateDocument(COLLECTIONS.PATROL_AREAS, areaId, updates);
+};
+
+export const deletePatrolArea = async (areaId) => {
+  return await deleteDocument(COLLECTIONS.PATROL_AREAS, areaId);
+};
+
 /**
  * Get all tanod members
  * @returns {Promise<Array>} Array of tanod users
@@ -94,14 +168,18 @@ export const checkoutAttendance = async (attendanceId, checkOutTime = new Date()
  * @returns {Promise<Array>} Array of attendance records
  */
 export const getTanodAttendance = async (tanodId, options = {}) => {
-  return await queryDocuments(
+  // No server-side orderBy to avoid requiring a Firestore composite index.
+  // Sort client-side instead.
+  const results = await queryDocuments(
     COLLECTIONS.ATTENDANCE,
     [{ field: 'tanodId', operator: '==', value: tanodId }],
-    {
-      orderBy: { field: 'checkInTime', direction: 'desc' },
-      ...options,
-    }
+    options
   );
+  return results.sort((a, b) => {
+    const aTime = a.checkInTime?.toDate ? a.checkInTime.toDate() : new Date(a.checkInTime || 0);
+    const bTime = b.checkInTime?.toDate ? b.checkInTime.toDate() : new Date(b.checkInTime || 0);
+    return bTime - aTime; // desc
+  });
 };
 
 /**
@@ -110,14 +188,12 @@ export const getTanodAttendance = async (tanodId, options = {}) => {
  * @returns {Promise<Array>} Array of attendance records
  */
 export const getAllAttendance = async (options = {}) => {
-  return await queryDocuments(
-    COLLECTIONS.ATTENDANCE,
-    [],
-    {
-      orderBy: { field: 'checkInTime', direction: 'desc' },
-      ...options,
-    }
-  );
+  const results = await queryDocuments(COLLECTIONS.ATTENDANCE, [], options);
+  return results.sort((a, b) => {
+    const aTime = a.checkInTime?.toDate ? a.checkInTime.toDate() : new Date(a.checkInTime || 0);
+    const bTime = b.checkInTime?.toDate ? b.checkInTime.toDate() : new Date(b.checkInTime || 0);
+    return bTime - aTime; // desc
+  });
 };
 
 /**
@@ -135,11 +211,17 @@ export const createSchedule = async (scheduleData) => {
  * @returns {Promise<Array>} Array of schedules
  */
 export const getTanodSchedules = async (tanodId) => {
-  return await queryDocuments(
+  // No server-side orderBy to avoid requiring a Firestore composite index.
+  // Sort client-side instead.
+  const results = await queryDocuments(
     COLLECTIONS.SCHEDULES,
-    [{ field: 'tanodId', operator: '==', value: tanodId }],
-    { orderBy: { field: 'date', direction: 'asc' } }
+    [{ field: 'tanodId', operator: '==', value: tanodId }]
   );
+  return results.sort((a, b) => {
+    const aDate = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+    const bDate = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+    return aDate - bDate; // asc
+  });
 };
 
 /**
@@ -147,11 +229,12 @@ export const getTanodSchedules = async (tanodId) => {
  * @returns {Promise<Array>} Array of schedules
  */
 export const getAllSchedules = async () => {
-  return await queryDocuments(
-    COLLECTIONS.SCHEDULES,
-    [],
-    { orderBy: { field: 'date', direction: 'asc' } }
-  );
+  const results = await queryDocuments(COLLECTIONS.SCHEDULES, []);
+  return results.sort((a, b) => {
+    const aDate = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+    const bDate = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+    return aDate - bDate; // asc
+  });
 };
 
 /**
@@ -232,4 +315,10 @@ export default {
   deleteSchedule,
   getTanodPerformance,
   subscribeToTanods,
+  createTanodProfile,
+  updateTanodProfile,
+  getAllPatrolAreas,
+  createPatrolArea,
+  updatePatrolAreaById,
+  deletePatrolArea,
 };

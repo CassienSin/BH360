@@ -3,6 +3,7 @@
  * Firebase operations for helpdesk ticket management
  */
 
+import { arrayUnion } from 'firebase/firestore';
 import {
   createDocument,
   getDocument,
@@ -116,22 +117,32 @@ export const assignTicket = async (ticketId, agentId) => {
 };
 
 /**
- * Add message to ticket
+ * Add message to ticket (atomic via arrayUnion)
  * @param {string} ticketId - Ticket ID
  * @param {Object} message - Message object
  */
 export const addTicketMessage = async (ticketId, message) => {
-  const ticket = await getTicket(ticketId);
-  const messages = ticket.messages || [];
-  
   return await updateDocument(TICKETS_COLLECTION, ticketId, {
-    messages: [
-      ...messages,
-      {
-        ...message,
-        timestamp: new Date(),
-      },
-    ],
+    messages: arrayUnion({
+      ...message,
+      id: `msg-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    }),
+  });
+};
+
+/**
+ * Add feedback to ticket (atomic via arrayUnion)
+ * @param {string} ticketId - Ticket ID
+ * @param {Object} feedback - Feedback object
+ */
+export const addTicketFeedback = async (ticketId, feedback) => {
+  return await updateDocument(TICKETS_COLLECTION, ticketId, {
+    feedback: arrayUnion({
+      ...feedback,
+      id: `feedback-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    }),
   });
 };
 
@@ -193,6 +204,7 @@ export default {
   updateTicket,
   assignTicket,
   addTicketMessage,
+  addTicketFeedback,
   resolveTicket,
   closeTicket,
   deleteTicket,

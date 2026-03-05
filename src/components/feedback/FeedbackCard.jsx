@@ -11,6 +11,13 @@ import {
 import { Star, User } from 'lucide-react';
 import { format } from 'date-fns';
 
+// Safely convert Firestore Timestamp or string/Date to JS Date
+const toDate = (ts) => {
+  if (!ts) return new Date();
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  return new Date(ts);
+};
+
 const FeedbackCard = ({ feedback }) => {
   return (
     <Card
@@ -40,7 +47,7 @@ const FeedbackCard = ({ feedback }) => {
               </Typography>
             </Stack>
             <Typography variant="caption" color="text.secondary">
-              {format(new Date(feedback.submittedAt), 'MMM dd, yyyy')}
+              {format(toDate(feedback.submittedAt), 'MMM dd, yyyy')}
             </Typography>
           </Stack>
 

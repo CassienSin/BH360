@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Stack, Typography, Card, CardContent, Grid, Box, useTheme, Chip, alpha, CircularProgress, Alert, Tab, Tabs } from '@mui/material';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Brain, Sparkles, TrendingUp, MapPin, LineChart as LineChartIcon } from 'lucide-react';
@@ -23,55 +23,56 @@ const Analytics = () => {
     }
   }, [incidents]);
 
+  // Issue #23: Update document title
+  useEffect(() => {
+    document.title = 'Analytics & Insights – BH360';
+  }, []);
+
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
 
-  // Process incident data for visualization
-  const processIncidentData = () => {
-    if (incidents.length === 0) return [];
+  // ── Memoized chart data — only recomputed when incidents change ────────────
 
-    const categoryCounts = {};
-    incidents.forEach(incident => {
-      const category = incident.category || 'other';
-      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
-    });
-
-    return Object.entries(categoryCounts).map(([name, value]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      value
-    }));
-  };
-
-  const incidentData = processIncidentData();
-
-  const COLORS = [
+  const COLORS = useMemo(() => [
     theme.palette.primary.main,
     theme.palette.secondary.main,
     theme.palette.success.main,
     theme.palette.warning.main,
     theme.palette.error.main,
     theme.palette.info.main,
-  ];
+  ], [theme.palette]);
 
-  // Priority distribution
-  const priorityData = [
-    { name: 'Minor', value: incidents.filter(i => i.priority === 'minor').length },
-    { name: 'Urgent', value: incidents.filter(i => i.priority === 'urgent').length },
+  const incidentData = useMemo(() => {
+    if (incidents.length === 0) return [];
+    const categoryCounts = {};
+    incidents.forEach(incident => {
+      const category = incident.category || 'other';
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    });
+    return Object.entries(categoryCounts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+    }));
+  }, [incidents]);
+
+  const priorityData = useMemo(() => [
+    { name: 'Minor',     value: incidents.filter(i => i.priority === 'minor').length },
+    { name: 'Urgent',    value: incidents.filter(i => i.priority === 'urgent').length },
     { name: 'Emergency', value: incidents.filter(i => i.priority === 'emergency').length },
-  ];
+  ], [incidents]);
 
-  // Location hotspots (top 5)
-  const locationCounts = {};
-  incidents.forEach(incident => {
-    const location = incident.location || 'Unknown';
-    locationCounts[location] = (locationCounts[location] || 0) + 1;
-  });
-
-  const locationData = Object.entries(locationCounts)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
-    .map(([name, value]) => ({ name, value }));
+  const locationData = useMemo(() => {
+    const locationCounts = {};
+    incidents.forEach(incident => {
+      const location = incident.location || 'Unknown';
+      locationCounts[location] = (locationCounts[location] || 0) + 1;
+    });
+    return Object.entries(locationCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+  }, [incidents]);
 
   // Error state
   if (error) {
@@ -88,7 +89,7 @@ const Analytics = () => {
   if (isLoading) {
     return (
       <Stack spacing={3} className="animate-fade-in">
-        <Typography variant="h4" fontWeight={700} className="gradient-text">
+        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
           Analytics & Insights
         </Typography>
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -103,7 +104,7 @@ const Analytics = () => {
     return (
       <Stack spacing={3} className="animate-fade-in">
         <Stack spacing={1}>
-          <Typography variant="h4" fontWeight={700} className="gradient-text">
+          <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
             Analytics & Insights
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -136,7 +137,8 @@ const Analytics = () => {
   return (
     <Stack spacing={3} className="animate-fade-in">
       <Stack spacing={1}>
-        <Typography variant="h4" fontWeight={700} className="gradient-text">
+        {/* Issue #6: component="h1" */}
+        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
           Analytics & Insights
         </Typography>
         <Typography variant="body2" color="text.secondary">

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import {
   Stack,
@@ -53,6 +53,11 @@ const TaskManagement = () => {
   
   // Get current user from Redux
   const currentUser = useSelector((state) => state.auth.user);
+
+  // Issue #23: Update document title
+  useEffect(() => {
+    document.title = 'My Tasks – BH360';
+  }, []);
   
   // Fetch incidents assigned to current tanod (use uid not id)
   const { data: assignedIncidents = [], isLoading: loadingAssigned, error: errorAssigned } = useIncidentsByTanod(currentUser?.uid);
@@ -274,7 +279,8 @@ const TaskManagement = () => {
     
     return (
       <Stack spacing={3}>
-        <Typography variant="h4" fontWeight={700}>
+        {/* Issue #6: component="h1" */}
+        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
           Task Management
         </Typography>
         <Alert severity="error">
@@ -336,7 +342,7 @@ const TaskManagement = () => {
     return (
       <Stack spacing={3}>
         <Stack spacing={1}>
-          <Typography variant="h4" fontWeight={700} className="gradient-text">
+          <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
             Task Management
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -364,7 +370,7 @@ const TaskManagement = () => {
   return (
     <Stack spacing={3} className="animate-fade-in">
       <Stack spacing={1}>
-        <Typography variant="h4" fontWeight={700} className="gradient-text">
+        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
           Task Management
         </Typography>
         <Typography variant="body2" color="text.secondary">

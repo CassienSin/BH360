@@ -4,6 +4,17 @@
  * Version 2.0 - Comprehensive AI Improvements
  */
 
+// ML service imports are done dynamically inside async functions to avoid
+// blocking the synchronous rule-based functions when the module is first loaded.
+// (@xenova/transformers and @tensorflow/tfjs are large and load asynchronously)
+
+// Helper: safely convert Firestore Timestamp or string/number to a JS Date
+const toDate = (ts) => {
+  if (!ts) return new Date();
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  return new Date(ts);
+};
+
 // ==================== SENTIMENT ANALYSIS ====================
 
 /**
@@ -283,7 +294,7 @@ export const calculatePriorityScore = (incident, context = {}) => {
   factors.urgency = urgencyScore;
 
   // 4. Time of day factor (0-12 points)
-  const hour = new Date(incident.createdAt || Date.now()).getHours();
+  const hour = toDate(incident.createdAt).getHours();
   let timeScore = 0;
   if (hour >= 22 || hour <= 5) {
     timeScore = 12; // Late night (10pm - 5am)
@@ -452,7 +463,7 @@ export const predictIncidentTrends = (incidents, options = {}) => {
   // Group incidents by date
   const incidentsByDate = {};
   incidents.forEach(incident => {
-    const date = new Date(incident.createdAt).toISOString().split('T')[0];
+    const date = toDate(incident.createdAt).toISOString().split('T')[0];
     incidentsByDate[date] = (incidentsByDate[date] || 0) + 1;
   });
 
@@ -584,11 +595,11 @@ export const predictHotspots = (incidents) => {
     locationData[location].categories[incident.category] = 
       (locationData[location].categories[incident.category] || 0) + 1;
     
-    const hour = new Date(incident.createdAt).getHours();
+    const hour = toDate(incident.createdAt).getHours();
     locationData[location].hours[hour]++;
     
     // Track recent incidents (last 30 days)
-    const daysSince = (Date.now() - new Date(incident.createdAt)) / (1000 * 60 * 60 * 24);
+    const daysSince = (Date.now() - toDate(incident.createdAt).getTime()) / (1000 * 60 * 60 * 24);
     if (daysSince <= 30) {
       locationData[location].recentIncidents.push(incident);
     }
@@ -956,7 +967,7 @@ export const analyzeTrends = (incidents) => {
 
   const hourCount = Array(24).fill(0);
   incidents.forEach(incident => {
-    const hour = new Date(incident.createdAt).getHours();
+    const hour = toDate(incident.createdAt).getHours();
     hourCount[hour]++;
   });
 
@@ -968,7 +979,7 @@ export const analyzeTrends = (incidents) => {
 
   const monthCount = {};
   incidents.forEach(incident => {
-    const month = new Date(incident.createdAt).toLocaleString('default', { month: 'short', year: 'numeric' });
+    const month = toDate(incident.createdAt).toLocaleString('default', { month: 'short', year: 'numeric' });
     monthCount[month] = (monthCount[month] || 0) + 1;
   });
 
@@ -1713,3 +1724,84 @@ export default {
   calculateTanodPerformance,
   calculateTeamPerformance
 };
+
+// ==================== ML-ENHANCED ASYNC FUNCTIONS ====================
+// These are drop-in async upgrades for the rule-based functions above.
+// Each falls back to the synchronous rule-based version on failure so the
+// app never breaks even if model download fails or times out.
+
+/**
+ * ML-enhanced sentiment analysis.
+ * Uses DistilBERT (Transformers.js) with fallback to keyword-based scoring.
+ *
+ * @param {string} text
+ * @param {Function} [onProgress]
+ * @returns {Promise<Object>} Same shape as analyzeSentiment()
+ */
+export const analyzeSentimentML = async (text, onProgress) => {
+  try {
+    const { mlAnalyzeSentiment } = await import('./mlService');
+    return await mlAnalyzeSentiment(text, onProgress);
+  } catch {
+    // Graceful fallback to rule-based
+    return { ...analyzeSentiment(text), mlPowered: false, fallback: true };
+  }
+};
+
+/**
+ * ML-enhanced incident classification using zero-shot NLI (Transformers.js).
+ * Falls back to keyword-based classifyIncident() on error.
+ *
+ * @param {string} title
+ * @param {string} description
+ * @param {Object} [metadata]
+ * @param {Function} [onProgress]
+ * @returns {Promise<Object>} Same shape as classifyIncident()
+ */
+export const classifyIncidentML = async (title, description, metadata = {}, onProgress) => {
+  try {
+    const { mlClassifyIncident } = await import('./mlService');
+    const mlResult = await mlClassifyIncident(title, description, onProgress);
+    // Merge ML classification with rule-based priority scoring context
+    const sentiment = await analyzeSentimentML(`${title} ${description}`, onProgress);
+    return {
+      ...mlResult,
+      sentiment,
+      metadata: {
+        hasUrgentKeywords: /urgent|emergency|critical|asap|immediate/i.test(`${title} ${description}`),
+        hasLocationMention: /street|road|avenue|corner|near|beside/i.test(`${title} ${description}`),
+        wordCount: `${title} ${description}`.split(/\s+/).length,
+      },
+    };
+  } catch {
+    return { ...classifyIncident(title, description, metadata), mlPowered: false, fallback: true };
+  }
+};
+
+/**
+ * ML-enhanced trend prediction using TensorFlow.js neural regression.
+ * Falls back to the moving-average predictIncidentTrends() on error.
+ *
+ * @param {Array} incidents - Raw incident array (with createdAt)
+ * @param {Object} [options]
+ * @param {number} [options.forecastDays=7]
+ * @returns {Promise<Object>} Extended predictions object
+ */
+export const predictIncidentTrendsML = async (incidents, options = {}) => {
+  const { forecastDays = 7 } = options;
+  try {
+    const { predictWithTF, buildDailySeries, detectAnomalies, analyseWeeklyPattern } = await import('./forecastService');
+    const daily = buildDailySeries(incidents);
+    const [forecast, anomalies, weeklyPattern] = await Promise.all([
+      predictWithTF(daily, forecastDays),
+      Promise.resolve(detectAnomalies(daily)),
+      Promise.resolve(analyseWeeklyPattern(daily)),
+    ]);
+    return { ...forecast, anomalies, weeklyPattern };
+  } catch {
+    return { ...predictIncidentTrends(incidents, options), mlPowered: false, fallback: true };
+  }
+};
+
+// Note: buildDailySeries, detectAnomalies, analyseWeeklyPattern can be imported
+// directly from './forecastService' to avoid loading @tensorflow/tfjs eagerly.

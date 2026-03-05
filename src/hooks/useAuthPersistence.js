@@ -7,29 +7,39 @@ export const useAuthPersistence = () => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
+    // ── Pre-hydrate from localStorage so the UI renders immediately on refresh
+    // rather than waiting for Firebase to re-resolve (avoids role flicker).
+    const storedToken = localStorage.getItem('token');
+    const storedUser  = localStorage.getItem('user');
+    if (storedToken && storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        dispatch(setCredentials({ user: parsedUser, token: storedToken }));
+      } catch {
+        // Corrupted storage — ignore and let Firebase resolve normally
+      }
+    }
+
     dispatch(setLoading(true));
 
-    // Subscribe to Firebase auth state changes
+    // ── Subscribe to Firebase auth state changes (authoritative source) ──
     const unsubscribe = subscribeToAuthState((user) => {
       if (user) {
-        // User is signed in
         const token = user.uid;
         dispatch(setCredentials({ user, token }));
-        
-        // Persist to localStorage
+
+        // Keep localStorage in sync with the latest Firestore data
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
       } else {
-        // User is signed out
         dispatch(logout());
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
-      
+
       dispatch(setLoading(false));
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [dispatch]);
 };

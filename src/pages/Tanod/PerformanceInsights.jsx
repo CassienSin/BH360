@@ -34,6 +34,11 @@ const PerformanceInsights = () => {
   const [performances, setPerformances] = useState([]);
   const [teamStats, setTeamStats] = useState(null);
 
+  // Issue #23: Update document title
+  useEffect(() => {
+    document.title = 'Performance Insights – BH360';
+  }, []);
+
   const isLoading = loadingTanods || loadingIncidents || loadingAttendance;
 
   // Calculate incident responses (incidents assigned to tanods) - memoized to prevent infinite re-renders
@@ -84,7 +89,7 @@ const PerformanceInsights = () => {
   if (isLoading) {
     return (
       <Stack spacing={3} className="animate-fade-in">
-        <Typography variant="h4" fontWeight={700} className="gradient-text">
+        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
           Performance Insights
         </Typography>
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -106,7 +111,7 @@ const PerformanceInsights = () => {
           >
             Back
           </Button>
-          <Typography variant="h4" fontWeight={700} className="gradient-text">
+          <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
             Performance Insights
           </Typography>
         </Stack>
@@ -144,7 +149,7 @@ const PerformanceInsights = () => {
           Back
         </Button>
         <Stack flexGrow={1}>
-          <Typography variant="h4" fontWeight={700} className="gradient-text">
+          <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
             Performance Insights
           </Typography>
           <Typography variant="body2" color="text.secondary">

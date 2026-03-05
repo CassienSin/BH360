@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   TextField,
@@ -30,6 +30,11 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Issue #23: Update document title
+  useEffect(() => {
+    document.title = 'Create Account – BH360';
+  }, []);
 
   const handleChange = (field) => (e) => {
     setFormData({ ...formData, [field]: e.target.value });
@@ -92,7 +97,8 @@ const Register = () => {
     <form onSubmit={handleSubmit}>
       <Stack spacing={3}>
         <Stack spacing={1} alignItems="center">
-          <Typography variant="h4" fontWeight={700} color="text.primary">
+          {/* Issue #6: component="h1" — Issue #13: gradient-text on page title */}
+          <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
             Create Account
           </Typography>
           <Typography variant="body2" color="text.secondary">

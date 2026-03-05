@@ -385,7 +385,7 @@ const IncidentDetails = () => {
             </Card>
 
             {/* AI Analysis - only if data available */}
-            {incident.aiClassification && <AIAnalysisPanel incident={incident} />}
+            {incident.aiAnalysis && <AIAnalysisPanel incident={incident} />}
 
             {/* Activity Timeline */}
             <ActivityTimeline activities={activities} />
@@ -518,7 +518,7 @@ const IncidentDetails = () => {
       </Stack>
 
       {/* Status Update Dialog */}
-      {isAdmin && (
+      {isAdmin && statusDialogOpen && (
         <StatusUpdateDialog
           open={statusDialogOpen}
           onClose={() => setStatusDialogOpen(false)}

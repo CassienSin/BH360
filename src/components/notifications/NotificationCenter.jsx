@@ -209,7 +209,14 @@ const NotificationCenter = ({ anchorEl, open, onClose }) => {
                     {notification.message}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {format(new Date(notification.createdAt), 'MMM dd, yyyy HH:mm')}
+                    {notification.createdAt
+                      ? format(
+                          notification.createdAt?.toDate
+                            ? notification.createdAt.toDate()
+                            : new Date(notification.createdAt),
+                          'MMM dd, yyyy HH:mm'
+                        )
+                      : ''}
                   </Typography>
                 </Stack>
 

@@ -36,6 +36,7 @@ export const COLLECTIONS = {
   TANOD: 'tanod',
   ATTENDANCE: 'attendance',
   SCHEDULES: 'schedules',
+  PATROL_AREAS: 'patrolAreas',
   NOTIFICATIONS: 'notifications',
   FEEDBACK: 'feedback',
   ANALYTICS: 'analytics',

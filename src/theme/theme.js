@@ -170,6 +170,26 @@ const theme = createTheme({
   ],
   components: {
     MuiButton: {
+      // Issue #17: Hover lift scoped to contained primary/secondary only (not error/warning/text)
+      // Issue #14: Gradient variant added for auth pages
+      variants: [
+        {
+          props: { variant: 'gradient' },
+          style: {
+            background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+            color: '#FFFFFF',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
+              transform: 'translateY(-2px)',
+              boxShadow: '0px 8px 24px rgba(99, 102, 241, 0.25)',
+            },
+            '&.Mui-disabled': {
+              background: 'rgba(0,0,0,0.12)',
+              color: 'rgba(0,0,0,0.26)',
+            },
+          },
+        },
+      ],
       styleOverrides: {
         root: {
           borderRadius: '12px',
@@ -177,10 +197,7 @@ const theme = createTheme({
           fontWeight: 600,
           padding: '10px 20px',
           transition: 'all 0.3s ease',
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: '0px 8px 24px rgba(99, 102, 241, 0.25)',
-          },
+          // Hover lift is NOT applied globally — only to contained primary/secondary below
         },
         sizeSmall: {
           padding: '6px 16px',
@@ -190,9 +207,53 @@ const theme = createTheme({
           padding: '12px 24px',
           fontSize: '0.9375rem',
         },
+        // Lift only on positive contained actions
+        containedPrimary: {
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: '0px 8px 24px rgba(99, 102, 241, 0.25)',
+          },
+        },
+        containedSecondary: {
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: '0px 8px 24px rgba(236, 72, 153, 0.25)',
+          },
+        },
+        containedSuccess: {
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: '0px 8px 24px rgba(46, 125, 50, 0.25)',
+          },
+        },
+        // Destructive / negative actions: no lift effect
+        containedError: {
+          '&:hover': {
+            transform: 'none',
+          },
+        },
+        containedWarning: {
+          '&:hover': {
+            transform: 'none',
+          },
+        },
       },
     },
     MuiCard: {
+      // Issue #17: Hover lift removed from theme default — use .hover-lift CSS class
+      // or a custom variant for explicitly interactive cards
+      variants: [
+        {
+          props: { variant: 'hoverable' },
+          style: {
+            cursor: 'pointer',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: '0px 12px 32px rgba(99, 102, 241, 0.2)',
+            },
+          },
+        },
+      ],
       styleOverrides: {
         root: {
           borderRadius: '16px',
@@ -201,10 +262,7 @@ const theme = createTheme({
           backgroundColor: 'rgba(255, 255, 255, 0.8)',
           border: '1px solid rgba(255, 255, 255, 0.3)',
           transition: 'all 0.3s ease',
-          '&:hover': {
-            transform: 'translateY(-4px)',
-            boxShadow: '0px 12px 32px rgba(15, 23, 42, 0.12)',
-          },
+          // No hover transform by default — applied selectively via .hover-lift class
         },
       },
     },

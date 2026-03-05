@@ -18,22 +18,31 @@ import {
   InputLabel,
   Box,
   alpha,
+  CircularProgress,
+  Skeleton,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Calendar, Plus, Sun, Moon, MapPin } from 'lucide-react';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { useDispatch, useSelector } from 'react-redux';
-import { addDutySchedule } from '../../store/slices/tanodSlice';
 import { toast } from 'react-toastify';
 import { format, isSameDay } from 'date-fns';
 import { formatDate, getShiftColor } from '../../utils/tanodFormatters';
+import {
+  useAllTanods,
+  useAllSchedules,
+  useAllPatrolAreas,
+  useCreateSchedule,
+} from '../../hooks/useTanod';
 
 const DutyScheduler = () => {
   const theme = useTheme();
-  const dispatch = useDispatch();
-  const { tanodMembers, dutySchedules, patrolAreas } = useSelector((state) => state.tanod);
+
+  const { data: tanodMembers = [], isLoading: loadingTanods } = useAllTanods();
+  const { data: dutySchedules = [], isLoading: loadingSchedules } = useAllSchedules();
+  const { data: patrolAreas = [], isLoading: loadingAreas } = useAllPatrolAreas();
+  const createSchedule = useCreateSchedule();
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [openDialog, setOpenDialog] = useState(false);
@@ -45,8 +54,13 @@ const DutyScheduler = () => {
     endTime: '18:00',
   });
 
-  const activeTanod = tanodMembers.filter((t) => t.status === 'active');
-  const schedulesForDate = dutySchedules.filter((s) => isSameDay(new Date(s.date), selectedDate));
+  const isLoading = loadingTanods || loadingSchedules || loadingAreas;
+  const activeTanod = tanodMembers.filter((t) => !t.status || t.status === 'active');
+
+  const schedulesForDate = dutySchedules.filter((s) => {
+    const schedDate = s.date?.toDate ? s.date.toDate() : new Date(s.date);
+    return isSameDay(schedDate, selectedDate);
+  });
 
   const handleOpenDialog = () => {
     setScheduleForm({
@@ -62,21 +76,15 @@ const DutyScheduler = () => {
   const handleChange = (field, value) => {
     setScheduleForm((prev) => {
       const updated = { ...prev, [field]: value };
-      // Auto-update times based on shift
       if (field === 'shift') {
-        if (value === 'day') {
-          updated.startTime = '06:00';
-          updated.endTime = '18:00';
-        } else {
-          updated.startTime = '18:00';
-          updated.endTime = '06:00';
-        }
+        updated.startTime = value === 'day' ? '06:00' : '18:00';
+        updated.endTime = value === 'day' ? '18:00' : '06:00';
       }
       return updated;
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!scheduleForm.tanodId || !scheduleForm.patrolArea) {
       toast.error('Please select tanod member and patrol area');
       return;
@@ -84,9 +92,8 @@ const DutyScheduler = () => {
 
     const tanod = tanodMembers.find((t) => t.id === scheduleForm.tanodId);
     const newSchedule = {
-      id: `sched-${Date.now()}`,
       tanodId: scheduleForm.tanodId,
-      tanodName: tanod.fullName,
+      tanodName: tanod?.displayName || tanod?.fullName || `${tanod?.firstName} ${tanod?.lastName}`,
       date: selectedDate,
       shift: scheduleForm.shift,
       startTime: scheduleForm.startTime,
@@ -95,19 +102,29 @@ const DutyScheduler = () => {
       status: 'scheduled',
     };
 
-    dispatch(addDutySchedule(newSchedule));
-    toast.success('Duty schedule created successfully');
-    setOpenDialog(false);
+    try {
+      await createSchedule.mutateAsync(newSchedule);
+      setOpenDialog(false);
+    } catch (err) {
+      console.error('[DutyScheduler] create schedule error:', err);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <Stack spacing={3}>
+        <Skeleton variant="rounded" height={48} />
+        <Skeleton variant="rounded" height={400} />
+      </Stack>
+    );
+  }
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Stack spacing={3}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Stack spacing={0.5}>
-            <Typography variant="h5" fontWeight={700}>
-              Duty Scheduler
-            </Typography>
+            <Typography variant="h5" fontWeight={700}>Duty Scheduler</Typography>
             <Typography variant="body2" color="text.secondary">
               Manage shift schedules and patrol assignments
             </Typography>
@@ -126,23 +143,17 @@ const DutyScheduler = () => {
               </CardContent>
             </Card>
 
-            {/* Legend */}
-            <Card
-              elevation={0}
-              sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, mt: 2 }}
-            >
+            <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, mt: 2 }}>
               <CardContent>
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                  Shift Legend
-                </Typography>
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>Shift Legend</Typography>
                 <Stack spacing={1}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Sun size={16} color={theme.palette.primary.main} />
-                    <Typography variant="body2">Day Shift (06:00 - 18:00)</Typography>
+                    <Typography variant="body2">Day Shift (06:00 – 18:00)</Typography>
                   </Stack>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Moon size={16} color={theme.palette.secondary.main} />
-                    <Typography variant="body2">Night Shift (18:00 - 06:00)</Typography>
+                    <Typography variant="body2">Night Shift (18:00 – 06:00)</Typography>
                   </Stack>
                 </Stack>
               </CardContent>
@@ -156,18 +167,11 @@ const DutyScheduler = () => {
                 <Stack spacing={2}>
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <Calendar size={20} color={theme.palette.primary.main} />
-                    <Typography variant="h6" fontWeight={600}>
-                      {formatDate(selectedDate)}
-                    </Typography>
+                    <Typography variant="h6" fontWeight={600}>{formatDate(selectedDate)}</Typography>
                   </Stack>
 
                   {schedulesForDate.length === 0 ? (
-                    <Stack
-                      alignItems="center"
-                      justifyContent="center"
-                      sx={{ py: 6, px: 2 }}
-                      spacing={2}
-                    >
+                    <Stack alignItems="center" justifyContent="center" sx={{ py: 6, px: 2 }} spacing={2}>
                       <Calendar size={48} color={theme.palette.text.secondary} />
                       <Typography variant="body2" color="text.secondary" textAlign="center">
                         No schedules for this date
@@ -206,26 +210,23 @@ const DutyScheduler = () => {
                                   </Stack>
                                 </Stack>
                                 <Chip
-                                  label={schedule.status.replace('-', ' ')}
+                                  label={schedule.status?.replace('-', ' ')}
                                   size="small"
                                   color={
                                     schedule.status === 'completed'
                                       ? 'success'
                                       : schedule.status === 'in-progress'
-                                        ? 'info'
-                                        : 'default'
+                                      ? 'info'
+                                      : 'default'
                                   }
                                   sx={{ textTransform: 'capitalize' }}
                                 />
                               </Stack>
-
                               <Stack spacing={0.5}>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                  <Typography variant="body2" fontWeight={600}>
-                                    Time:
-                                  </Typography>
+                                  <Typography variant="body2" fontWeight={600}>Time:</Typography>
                                   <Typography variant="body2" color="text.secondary">
-                                    {schedule.startTime} - {schedule.endTime}
+                                    {schedule.startTime} – {schedule.endTime}
                                   </Typography>
                                 </Stack>
                                 <Stack direction="row" spacing={1} alignItems="center">
@@ -256,12 +257,8 @@ const DutyScheduler = () => {
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
           <DialogTitle>
-            <Typography variant="h6" fontWeight={700}>
-              Schedule Duty Shift
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {formatDate(selectedDate)}
-            </Typography>
+            <Typography variant="h6" fontWeight={700}>Schedule Duty Shift</Typography>
+            <Typography variant="body2" color="text.secondary">{formatDate(selectedDate)}</Typography>
           </DialogTitle>
           <DialogContent>
             <Stack spacing={3} sx={{ mt: 1 }}>
@@ -272,11 +269,15 @@ const DutyScheduler = () => {
                   onChange={(e) => handleChange('tanodId', e.target.value)}
                   label="Tanod Member"
                 >
-                  {activeTanod.map((tanod) => (
-                    <MenuItem key={tanod.id} value={tanod.id}>
-                      {tanod.fullName}
-                    </MenuItem>
-                  ))}
+                  {activeTanod.length === 0 ? (
+                    <MenuItem disabled>No active tanod members</MenuItem>
+                  ) : (
+                    activeTanod.map((tanod) => (
+                      <MenuItem key={tanod.id} value={tanod.id}>
+                        {tanod.displayName || tanod.fullName || `${tanod.firstName} ${tanod.lastName}`}
+                      </MenuItem>
+                    ))
+                  )}
                 </Select>
               </FormControl>
 
@@ -287,8 +288,8 @@ const DutyScheduler = () => {
                   onChange={(e) => handleChange('shift', e.target.value)}
                   label="Shift"
                 >
-                  <MenuItem value="day">Day Shift (06:00 - 18:00)</MenuItem>
-                  <MenuItem value="night">Night Shift (18:00 - 06:00)</MenuItem>
+                  <MenuItem value="day">Day Shift (06:00 – 18:00)</MenuItem>
+                  <MenuItem value="night">Night Shift (18:00 – 06:00)</MenuItem>
                 </Select>
               </FormControl>
 
@@ -322,11 +323,15 @@ const DutyScheduler = () => {
                   onChange={(e) => handleChange('patrolArea', e.target.value)}
                   label="Patrol Area"
                 >
-                  {patrolAreas.map((area) => (
-                    <MenuItem key={area.id} value={area.name}>
-                      {area.name}
-                    </MenuItem>
-                  ))}
+                  {patrolAreas.length === 0 ? (
+                    <MenuItem disabled>No patrol areas defined</MenuItem>
+                  ) : (
+                    patrolAreas.map((area) => (
+                      <MenuItem key={area.id} value={area.name}>
+                        {area.name}
+                      </MenuItem>
+                    ))
+                  )}
                 </Select>
               </FormControl>
             </Stack>
@@ -335,8 +340,13 @@ const DutyScheduler = () => {
             <Button onClick={() => setOpenDialog(false)} variant="outlined">
               Cancel
             </Button>
-            <Button onClick={handleSubmit} variant="contained">
-              Schedule Shift
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
+              disabled={createSchedule.isPending}
+              startIcon={createSchedule.isPending ? <CircularProgress size={16} color="inherit" /> : null}
+            >
+              {createSchedule.isPending ? 'Scheduling…' : 'Schedule Shift'}
             </Button>
           </DialogActions>
         </Dialog>

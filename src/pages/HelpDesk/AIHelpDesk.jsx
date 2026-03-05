@@ -26,6 +26,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  CircularProgress,
 } from '@mui/material';
 import {
   Send,
@@ -39,29 +40,57 @@ import {
   AlertCircle,
   Circle,
   Sparkles,
-  BookOpen,
   FileText,
   Search,
   HelpCircle,
   Star,
 } from 'lucide-react';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { createTicket, addMessageToTicket, addFeedbackToTicket } from '../../store/slices/ticketSlice';
+import { useAppSelector } from '../../store/hooks';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
-import { generateAIResponse, barangayServices, faqDatabase, getServicesByCategory, getFAQCategories } from '../../services/helpDeskAI';
+import {
+  generateAIResponse,
+  barangayServices,
+  faqDatabase,
+  getFAQCategories,
+} from '../../services/helpDeskAI';
+import {
+  useAllTicketsRealtime,
+  useCreateTicket,
+  useAddTicketMessage,
+  useAddTicketFeedback,
+} from '../../hooks/useTickets';
 import ServiceCard from '../../components/helpdesk/ServiceCard';
 import ServiceDetailsDialog from '../../components/helpdesk/ServiceDetailsDialog';
 import FAQAccordion from '../../components/helpdesk/FAQAccordion';
 import FeedbackDialog from '../../components/feedback/FeedbackDialog';
 import FeedbackCard from '../../components/feedback/FeedbackCard';
 
+// Helper to safely convert Firestore Timestamp or string to JS Date
+const toDate = (ts) => {
+  if (!ts) return new Date();
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  return new Date(ts);
+};
+
 const AIHelpDesk = () => {
   const theme = useTheme();
-  const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  const { tickets } = useAppSelector((state) => state.ticket);
   const chatEndRef = useRef(null);
+
+  // --- Firestore real-time tickets ---
+  const { data: allTickets, loading: ticketsLoading } = useAllTicketsRealtime();
+  const myTickets = (allTickets || []).filter((t) => t.userId === user?.id || t.createdBy?.id === user?.id);
+
+  // --- Mutations ---
+  const createTicketMutation = useCreateTicket();
+  const addMessageMutation = useAddTicketMessage();
+  const addFeedbackMutation = useAddTicketFeedback();
+
+  // Issue #23: Update document title
+  useEffect(() => {
+    document.title = 'AI Help Desk – BH360';
+  }, []);
 
   const [currentTab, setCurrentTab] = useState(0);
   const [messages, setMessages] = useState([
@@ -76,13 +105,18 @@ const AIHelpDesk = () => {
   const [showTicketDialog, setShowTicketDialog] = useState(false);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [selectedTicketForFeedback, setSelectedTicketForFeedback] = useState(null);
-  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
   const [ticketData, setTicketData] = useState({
     title: '',
     category: 'general',
     priority: 'medium',
   });
+
+  // Derive selectedTicket from live data (auto-updates after mutations)
+  const selectedTicket = selectedTicketId
+    ? myTickets.find((t) => t.id === selectedTicketId) || null
+    : null;
 
   // Services state
   const [selectedService, setSelectedService] = useState(null);
@@ -93,13 +127,11 @@ const AIHelpDesk = () => {
   const [faqFilter, setFaqFilter] = useState('all');
   const [faqSearch, setFaqSearch] = useState('');
 
-  // Filter tickets created by current user
-  const myTickets = tickets.filter((t) => t.createdBy.id === user?.id);
-
   // Filtered services
   const filteredServices = Object.values(barangayServices).filter((service) => {
     const matchesCategory = serviceFilter === 'all' || service.category === serviceFilter;
-    const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch =
+      service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       service.description.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -107,7 +139,8 @@ const AIHelpDesk = () => {
   // Filtered FAQs
   const filteredFAQs = faqDatabase.filter((faq) => {
     const matchesCategory = faqFilter === 'all' || faq.category === faqFilter;
-    const matchesSearch = faq.question.toLowerCase().includes(faqSearch.toLowerCase()) ||
+    const matchesSearch =
+      faq.question.toLowerCase().includes(faqSearch.toLowerCase()) ||
       faq.answer.toLowerCase().includes(faqSearch.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -117,25 +150,23 @@ const AIHelpDesk = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!inputMessage.trim()) return;
+  // Core send logic — accepts an explicit text so it can be called from
+  // both the input field and suggestion chips without stale-closure issues.
+  const sendMessage = (text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
 
-    // Add user message
     const newMessage = {
       id: Date.now().toString(),
-      text: inputMessage,
+      text: trimmed,
       sender: 'user',
       timestamp: new Date(),
     };
 
-    setMessages([...messages, newMessage]);
-    const userQuery = inputMessage;
-    setInputMessage('');
+    setMessages((prev) => [...prev, newMessage]);
 
-    // Generate AI response
     setTimeout(() => {
-      const aiResponse = generateAIResponse(userQuery);
-      
+      const aiResponse = generateAIResponse(trimmed);
       const botMessage = {
         id: (Date.now() + 1).toString(),
         text: aiResponse.text,
@@ -145,18 +176,21 @@ const AIHelpDesk = () => {
         relatedService: aiResponse.relatedService,
         needsTicket: aiResponse.needsTicket,
       };
-
       setMessages((prev) => [...prev, botMessage]);
 
-      // Pre-fill ticket if AI suggests it
       if (aiResponse.needsTicket) {
         setTicketData({
-          title: userQuery.substring(0, 100),
+          title: trimmed.substring(0, 100),
           category: 'general',
           priority: 'medium',
         });
       }
     }, 800);
+  };
+
+  const handleSend = () => {
+    sendMessage(inputMessage);
+    setInputMessage('');
   };
 
   const handleSuggestionClick = (suggestion) => {
@@ -167,40 +201,29 @@ const AIHelpDesk = () => {
     } else if (suggestion === 'View FAQs' || suggestion === 'Common Questions') {
       setCurrentTab(2);
     } else if (suggestion.startsWith('View ') && suggestion.includes(' details')) {
-      // Extract service name and show details
       const serviceName = suggestion.replace('View ', '').replace(' details', '');
-      const service = Object.values(barangayServices).find(
-        s => s.name.toLowerCase().includes(serviceName.toLowerCase())
+      const service = Object.values(barangayServices).find((s) =>
+        s.name.toLowerCase().includes(serviceName.toLowerCase())
       );
       if (service) {
         setSelectedService(service);
         setCurrentTab(1);
       }
     } else {
-      // Send as message
-      setInputMessage(suggestion);
-      setTimeout(() => handleSend(), 100);
+      // Send directly — avoids stale-closure issue of setting state then calling handleSend
+      sendMessage(suggestion);
     }
   };
 
-  const handleCreateTicket = () => {
+  const handleCreateTicket = async () => {
     if (!ticketData.title.trim()) {
       toast.error('Please provide a title for the ticket');
       return;
     }
-
     if (!user) {
       toast.error('You must be logged in to create a ticket');
       return;
     }
-
-    const initialMessage = {
-      id: `msg-${Date.now()}`,
-      text: `Ticket created: ${ticketData.title}`,
-      sender: 'bot',
-      senderName: 'AI Assistant',
-      timestamp: new Date(),
-    };
 
     const conversationMessages = messages
       .filter((msg) => msg.sender === 'user')
@@ -209,107 +232,66 @@ const AIHelpDesk = () => {
         text: msg.text,
         sender: 'user',
         senderName: `${user.firstName} ${user.lastName}`,
-        timestamp: msg.timestamp,
+        timestamp: new Date(msg.timestamp).toISOString(),
       }));
 
-    dispatch(
-      createTicket({
+    conversationMessages.push({
+      id: `msg-bot-${Date.now()}`,
+      text: `Ticket created: ${ticketData.title}`,
+      sender: 'bot',
+      senderName: 'AI Assistant',
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      await createTicketMutation.mutateAsync({
         title: ticketData.title,
         category: ticketData.category,
         status: 'open',
         priority: ticketData.priority,
+        userId: user.id,
         createdBy: {
           id: user.id,
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
         },
-        messages: [...conversationMessages, initialMessage],
-      })
-    );
+        messages: conversationMessages,
+      });
 
-    toast.success('Support ticket created successfully!');
+      toast.success('Support ticket created successfully!');
 
-    const confirmMessage = {
-      id: Date.now().toString(),
-      text: 'Great! I\'ve created a support ticket for you. Our team will review it and get back to you soon. You can check your tickets in the "My Tickets" tab.',
-      sender: 'bot',
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, confirmMessage]);
+      const confirmMessage = {
+        id: Date.now().toString(),
+        text: "Great! I've created a support ticket for you. Our team will review it and get back to you soon. You can check your tickets in the \"My Tickets\" tab.",
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, confirmMessage]);
 
-    setShowTicketDialog(false);
-    setTicketData({
-      title: '',
-      category: 'general',
-      priority: 'medium',
-    });
-    setCurrentTab(3); // Switch to My Tickets tab
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'open':
-        return 'default';
-      case 'in-progress':
-        return 'warning';
-      case 'resolved':
-        return 'success';
-      case 'closed':
-        return 'error';
-      default:
-        return 'default';
+      setShowTicketDialog(false);
+      setTicketData({ title: '', category: 'general', priority: 'medium' });
+      setCurrentTab(3);
+    } catch {
+      // error toast handled in mutation
     }
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'low':
-        return 'success';
-      case 'medium':
-        return 'warning';
-      case 'high':
-        return 'error';
-      default:
-        return 'warning';
-    }
-  };
+  const handleSendTicketReply = async () => {
+    if (!selectedTicketId || !replyMessage.trim() || !user) return;
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'open':
-        return <Circle size={16} />;
-      case 'in-progress':
-        return <Clock size={16} />;
-      case 'resolved':
-        return <CheckCircle2 size={16} />;
-      case 'closed':
-        return <X size={16} />;
-      default:
-        return <Circle size={16} />;
-    }
-  };
-
-  const handleSendTicketReply = () => {
-    if (!selectedTicket || !replyMessage.trim() || !user) return;
-
-    dispatch(
-      addMessageToTicket({
-        ticketId: selectedTicket.id,
+    try {
+      await addMessageMutation.mutateAsync({
+        ticketId: selectedTicketId,
         message: {
           text: replyMessage,
           sender: 'user',
           senderName: `${user.firstName} ${user.lastName}`,
-          timestamp: new Date(),
         },
-      })
-    );
-
-    setReplyMessage('');
-    toast.success('Reply sent successfully');
-
-    const updatedTicket = tickets.find((t) => t.id === selectedTicket.id);
-    if (updatedTicket) {
-      setSelectedTicket(updatedTicket);
+      });
+      setReplyMessage('');
+      toast.success('Reply sent successfully');
+    } catch {
+      // error handled by mutation
     }
   };
 
@@ -321,26 +303,47 @@ const AIHelpDesk = () => {
     }
   };
 
-  const handleFeedbackSubmit = (feedbackData) => {
-    if (selectedTicketForFeedback) {
-      dispatch(
-        addFeedbackToTicket({
-          ticketId: selectedTicketForFeedback.id,
-          feedback: {
-            ...feedbackData,
-            userId: user?.id,
-            userName: `${user?.firstName} ${user?.lastName}`,
-          },
-        })
-      );
+  const handleFeedbackSubmit = async (feedbackData) => {
+    if (!selectedTicketForFeedback) return;
+    try {
+      await addFeedbackMutation.mutateAsync({
+        ticketId: selectedTicketForFeedback.id,
+        feedback: {
+          ...feedbackData,
+          userId: user?.id,
+          userName: `${user?.firstName} ${user?.lastName}`,
+        },
+      });
       setFeedbackDialogOpen(false);
       setSelectedTicketForFeedback(null);
+    } catch {
+      // handled by mutation
     }
   };
 
   const handleRateTicket = (ticket) => {
     setSelectedTicketForFeedback(ticket);
     setFeedbackDialogOpen(true);
+  };
+
+  const getStatusColor = (status) => {
+    const map = { open: 'default', 'in-progress': 'warning', resolved: 'success', closed: 'error' };
+    return map[status] || 'default';
+  };
+
+  const getPriorityColor = (priority) => {
+    const map = { low: 'success', medium: 'warning', high: 'error' };
+    return map[priority] || 'warning';
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'open': return <Circle size={16} />;
+      case 'in-progress': return <Clock size={16} />;
+      case 'resolved': return <CheckCircle2 size={16} />;
+      case 'closed': return <X size={16} />;
+      default: return <Circle size={16} />;
+    }
   };
 
   return (
@@ -359,7 +362,8 @@ const AIHelpDesk = () => {
             >
               <Sparkles size={24} />
             </Box>
-            <Typography variant="h4" fontWeight={700}>
+            {/* Issue #6: component="h1" */}
+            <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
               AI Help Desk
             </Typography>
           </Stack>
@@ -373,27 +377,11 @@ const AIHelpDesk = () => {
       <Tabs
         value={currentTab}
         onChange={(_, newValue) => setCurrentTab(newValue)}
-        sx={{
-          '& .MuiTab-root': {
-            fontWeight: 600,
-          },
-        }}
+        sx={{ '& .MuiTab-root': { fontWeight: 600 } }}
       >
-        <Tab
-          icon={<MessageCircle size={18} />}
-          iconPosition="start"
-          label="Chat with AI"
-        />
-        <Tab
-          icon={<FileText size={18} />}
-          iconPosition="start"
-          label="Services"
-        />
-        <Tab
-          icon={<HelpCircle size={18} />}
-          iconPosition="start"
-          label="FAQs"
-        />
+        <Tab icon={<MessageCircle size={18} />} iconPosition="start" label="Chat with AI" />
+        <Tab icon={<FileText size={18} />} iconPosition="start" label="Services" />
+        <Tab icon={<HelpCircle size={18} />} iconPosition="start" label="FAQs" />
         <Tab
           icon={<Ticket size={18} />}
           iconPosition="start"
@@ -457,8 +445,7 @@ const AIHelpDesk = () => {
                       <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
                         {message.text}
                       </Typography>
-                      
-                      {/* Suggestions */}
+
                       {message.suggestions && message.suggestions.length > 0 && (
                         <Stack direction="row" spacing={1} mt={2} flexWrap="wrap">
                           {message.suggestions.map((suggestion, index) => (
@@ -470,9 +457,7 @@ const AIHelpDesk = () => {
                               sx={{
                                 cursor: 'pointer',
                                 backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                '&:hover': {
-                                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                },
+                                '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.2) },
                                 mb: 0.5,
                               }}
                             />
@@ -480,7 +465,6 @@ const AIHelpDesk = () => {
                         </Stack>
                       )}
 
-                      {/* Related Service */}
                       {message.relatedService && (
                         <Box
                           sx={{
@@ -489,9 +473,7 @@ const AIHelpDesk = () => {
                             borderRadius: 2,
                             backgroundColor: alpha(theme.palette.info.main, 0.1),
                             cursor: 'pointer',
-                            '&:hover': {
-                              backgroundColor: alpha(theme.palette.info.main, 0.15),
-                            },
+                            '&:hover': { backgroundColor: alpha(theme.palette.info.main, 0.15) },
                           }}
                           onClick={() => {
                             setSelectedService(message.relatedService);
@@ -521,11 +503,13 @@ const AIHelpDesk = () => {
 
           <Box sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
             <Stack direction="row" spacing={1}>
+              {/* Issue #25: whiteSpace: 'nowrap' prevents text wrapping in narrow container */}
               <Button
                 variant="outlined"
                 startIcon={<Ticket size={18} />}
                 onClick={() => setShowTicketDialog(true)}
                 size="small"
+                sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 Create Ticket
               </Button>
@@ -553,7 +537,6 @@ const AIHelpDesk = () => {
       {/* Services Tab */}
       {currentTab === 1 && (
         <Stack spacing={3} sx={{ flexGrow: 1, overflow: 'auto' }}>
-          {/* Filters */}
           <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
             <CardContent>
               <Stack direction="row" spacing={2} flexWrap="wrap">
@@ -588,26 +571,18 @@ const AIHelpDesk = () => {
             </CardContent>
           </Card>
 
-          {/* Services Grid */}
           <Grid container spacing={3}>
             {filteredServices.map((service) => (
               <Grid key={service.id} size={{ xs: 12, md: 6, lg: 4 }}>
-                <ServiceCard
-                  service={service}
-                  onViewDetails={(s) => setSelectedService(s)}
-                />
+                <ServiceCard service={service} onViewDetails={(s) => setSelectedService(s)} />
               </Grid>
             ))}
           </Grid>
 
           {filteredServices.length === 0 && (
             <Box sx={{ textAlign: 'center', py: 8 }}>
-              <Typography variant="h6" color="text.secondary">
-                No services found
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Try adjusting your search or filters
-              </Typography>
+              <Typography variant="h6" color="text.secondary">No services found</Typography>
+              <Typography variant="body2" color="text.secondary">Try adjusting your search or filters</Typography>
             </Box>
           )}
         </Stack>
@@ -616,7 +591,6 @@ const AIHelpDesk = () => {
       {/* FAQs Tab */}
       {currentTab === 2 && (
         <Stack spacing={3} sx={{ flexGrow: 1, overflow: 'auto' }}>
-          {/* Filters */}
           <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
             <CardContent>
               <Stack direction="row" spacing={2} flexWrap="wrap">
@@ -643,9 +617,7 @@ const AIHelpDesk = () => {
                   >
                     <MenuItem value="all">All Categories</MenuItem>
                     {getFAQCategories().map((cat) => (
-                      <MenuItem key={cat} value={cat}>
-                        {cat}
-                      </MenuItem>
+                      <MenuItem key={cat} value={cat}>{cat}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -653,57 +625,40 @@ const AIHelpDesk = () => {
             </CardContent>
           </Card>
 
-          {/* FAQs List */}
           <Box>
             {filteredFAQs.map((faq) => (
-              <FAQAccordion
-                key={faq.id}
-                faq={faq}
-                onRelatedServiceClick={handleRelatedServiceClick}
-              />
+              <FAQAccordion key={faq.id} faq={faq} onRelatedServiceClick={handleRelatedServiceClick} />
             ))}
           </Box>
 
           {filteredFAQs.length === 0 && (
             <Box sx={{ textAlign: 'center', py: 8 }}>
-              <Typography variant="h6" color="text.secondary">
-                No FAQs found
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Try adjusting your search or filters
-              </Typography>
+              <Typography variant="h6" color="text.secondary">No FAQs found</Typography>
+              <Typography variant="body2" color="text.secondary">Try adjusting your search or filters</Typography>
             </Box>
           )}
         </Stack>
       )}
 
-      {/* My Tickets Tab - Keep existing implementation */}
+      {/* My Tickets Tab */}
       {currentTab === 3 && (
         <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-          {myTickets.length === 0 ? (
+          {ticketsLoading ? (
+            <Box display="flex" justifyContent="center" py={6}>
+              <CircularProgress />
+            </Box>
+          ) : myTickets.length === 0 ? (
             <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
               <CardContent>
                 <Stack alignItems="center" spacing={2} py={4}>
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 3,
-                      backgroundColor: alpha(theme.palette.grey[500], 0.1),
-                    }}
-                  >
+                  <Box sx={{ p: 2, borderRadius: 3, backgroundColor: alpha(theme.palette.grey[500], 0.1) }}>
                     <Ticket size={48} color={theme.palette.text.secondary} />
                   </Box>
-                  <Typography variant="h6" color="text.secondary">
-                    No tickets yet
-                  </Typography>
+                  <Typography variant="h6" color="text.secondary">No tickets yet</Typography>
                   <Typography variant="body2" color="text.secondary" textAlign="center">
                     Create your first ticket by chatting with the AI assistant
                   </Typography>
-                  <Button
-                    variant="contained"
-                    startIcon={<MessageCircle size={18} />}
-                    onClick={() => setCurrentTab(0)}
-                  >
+                  <Button variant="contained" startIcon={<MessageCircle size={18} />} onClick={() => setCurrentTab(0)}>
                     Start Chat
                   </Button>
                 </Stack>
@@ -719,27 +674,18 @@ const AIHelpDesk = () => {
                       borderRadius: 3,
                       border: `1px solid ${theme.palette.divider}`,
                       transition: 'all 0.2s',
-                      '&:hover': {
-                        borderColor: theme.palette.primary.main,
-                        transform: 'translateY(-2px)',
-                      },
+                      '&:hover': { borderColor: theme.palette.primary.main, transform: 'translateY(-2px)' },
                     }}
                   >
                     <CardContent>
                       <Stack spacing={2}>
                         <Stack direction="row" justifyContent="space-between" alignItems="start">
                           <Stack direction="row" spacing={1} alignItems="center">
-                            <Box
-                              sx={{
-                                p: 1,
-                                borderRadius: 2,
-                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                              }}
-                            >
+                            <Box sx={{ p: 1, borderRadius: 2, backgroundColor: alpha(theme.palette.primary.main, 0.1) }}>
                               <Ticket size={20} color={theme.palette.primary.main} />
                             </Box>
                             <Typography variant="caption" color="text.secondary">
-                              #{ticket.id}
+                              #{ticket.id.slice(-6).toUpperCase()}
                             </Typography>
                           </Stack>
                           <Chip
@@ -751,28 +697,13 @@ const AIHelpDesk = () => {
                           />
                         </Stack>
 
-                        <Box
-                          sx={{ cursor: 'pointer' }}
-                          onClick={() => setSelectedTicket(ticket)}
-                        >
-                          <Typography variant="h6" fontWeight={600} noWrap>
-                            {ticket.title}
-                          </Typography>
+                        <Box sx={{ cursor: 'pointer' }} onClick={() => setSelectedTicketId(ticket.id)}>
+                          <Typography variant="h6" fontWeight={600} noWrap>{ticket.title}</Typography>
                         </Box>
 
                         <Stack direction="row" spacing={1}>
-                          <Chip
-                            label={ticket.priority}
-                            size="small"
-                            color={getPriorityColor(ticket.priority)}
-                            sx={{ textTransform: 'capitalize' }}
-                          />
-                          <Chip
-                            label={ticket.category}
-                            size="small"
-                            variant="outlined"
-                            sx={{ textTransform: 'capitalize' }}
-                          />
+                          <Chip label={ticket.priority} size="small" color={getPriorityColor(ticket.priority)} sx={{ textTransform: 'capitalize' }} />
+                          <Chip label={ticket.category} size="small" variant="outlined" sx={{ textTransform: 'capitalize' }} />
                         </Stack>
 
                         <Divider />
@@ -781,43 +712,40 @@ const AIHelpDesk = () => {
                           <Stack direction="row" alignItems="center" spacing={1}>
                             <MessageCircle size={14} color={theme.palette.text.secondary} />
                             <Typography variant="caption" color="text.secondary">
-                              {ticket.messages.length} message{ticket.messages.length !== 1 ? 's' : ''}
+                              {(ticket.messages || []).length} message{(ticket.messages || []).length !== 1 ? 's' : ''}
                             </Typography>
                           </Stack>
                           <Stack direction="row" alignItems="center" spacing={1}>
                             <Clock size={14} color={theme.palette.text.secondary} />
                             <Typography variant="caption" color="text.secondary">
-                              {format(new Date(ticket.createdAt), 'MMM dd, yyyy HH:mm')}
+                              {format(toDate(ticket.createdAt), 'MMM dd, yyyy HH:mm')}
                             </Typography>
                           </Stack>
                         </Stack>
 
-                        {(ticket.status === 'resolved' || ticket.status === 'closed') && 
-                         !ticket.feedback?.some(f => f.userId === user?.id) && (
-                          <>
-                            <Divider />
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              startIcon={<Star size={16} />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRateTicket(ticket);
-                              }}
-                              fullWidth
-                            >
-                              Rate Experience
-                            </Button>
-                          </>
-                        )}
-                        
+                        {(ticket.status === 'resolved' || ticket.status === 'closed') &&
+                          !ticket.feedback?.some((f) => f.userId === user?.id) && (
+                            <>
+                              <Divider />
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<Star size={16} />}
+                                onClick={(e) => { e.stopPropagation(); handleRateTicket(ticket); }}
+                                fullWidth
+                              >
+                                Rate Experience
+                              </Button>
+                            </>
+                          )}
+
                         {ticket.feedback && ticket.feedback.length > 0 && (
                           <>
                             <Divider />
                             <Stack direction="row" spacing={1} alignItems="center">
                               <Star size={14} color={theme.palette.warning.main} />
                               <Typography variant="caption" color="text.secondary">
-                                Rated {ticket.feedback[0].overallRating.toFixed(1)}/5.0
+                                Rated {ticket.feedback[0].overallRating?.toFixed(1)}/5.0
                               </Typography>
                             </Stack>
                           </>
@@ -833,50 +761,28 @@ const AIHelpDesk = () => {
       )}
 
       {/* Service Details Dialog */}
-      <ServiceDetailsDialog
-        open={!!selectedService}
-        onClose={() => setSelectedService(null)}
-        service={selectedService}
-      />
+      <ServiceDetailsDialog open={!!selectedService} onClose={() => setSelectedService(null)} service={selectedService} />
 
       {/* Feedback Dialog */}
       <FeedbackDialog
         open={feedbackDialogOpen}
-        onClose={() => {
-          setFeedbackDialogOpen(false);
-          setSelectedTicketForFeedback(null);
-        }}
+        onClose={() => { setFeedbackDialogOpen(false); setSelectedTicketForFeedback(null); }}
         onSubmit={handleFeedbackSubmit}
         type="ticket"
         itemTitle={selectedTicketForFeedback?.title}
       />
 
       {/* Create Ticket Dialog */}
-      <Dialog
-        open={showTicketDialog}
-        onClose={() => setShowTicketDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={showTicketDialog} onClose={() => setShowTicketDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <Stack direction="row" alignItems="center" spacing={1.5}>
-              <Box
-                sx={{
-                  p: 1,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                }}
-              >
+              <Box sx={{ p: 1, borderRadius: 2, backgroundColor: alpha(theme.palette.primary.main, 0.1) }}>
                 <Ticket size={24} color={theme.palette.primary.main} />
               </Box>
-              <Typography variant="h6" fontWeight={700}>
-                Create Support Ticket
-              </Typography>
+              <Typography variant="h6" fontWeight={700}>Create Support Ticket</Typography>
             </Stack>
-            <IconButton onClick={() => setShowTicketDialog(false)} size="small">
-              <X size={20} />
-            </IconButton>
+            <IconButton onClick={() => setShowTicketDialog(false)} size="small"><X size={20} /></IconButton>
           </Stack>
         </DialogTitle>
 
@@ -890,17 +796,11 @@ const AIHelpDesk = () => {
               fullWidth
               placeholder="Brief description of your issue"
             />
-
             <TextField
               select
               label="Category"
               value={ticketData.category}
-              onChange={(e) =>
-                setTicketData({
-                  ...ticketData,
-                  category: e.target.value,
-                })
-              }
+              onChange={(e) => setTicketData({ ...ticketData, category: e.target.value })}
               required
               fullWidth
             >
@@ -910,17 +810,11 @@ const AIHelpDesk = () => {
               <MenuItem value="request">Document Request</MenuItem>
               <MenuItem value="other">Other</MenuItem>
             </TextField>
-
             <TextField
               select
               label="Priority"
               value={ticketData.priority}
-              onChange={(e) =>
-                setTicketData({
-                  ...ticketData,
-                  priority: e.target.value,
-                })
-              }
+              onChange={(e) => setTicketData({ ...ticketData, priority: e.target.value })}
               required
               fullWidth
             >
@@ -928,7 +822,6 @@ const AIHelpDesk = () => {
               <MenuItem value="medium">Medium</MenuItem>
               <MenuItem value="high">High</MenuItem>
             </TextField>
-
             <Box
               sx={{
                 p: 2,
@@ -945,133 +838,97 @@ const AIHelpDesk = () => {
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={() => setShowTicketDialog(false)} variant="outlined">
-            Cancel
-          </Button>
-          <Button onClick={handleCreateTicket} variant="contained">
-            Create Ticket
+          <Button onClick={() => setShowTicketDialog(false)} variant="outlined">Cancel</Button>
+          <Button
+            onClick={handleCreateTicket}
+            variant="contained"
+            disabled={createTicketMutation.isPending}
+          >
+            {createTicketMutation.isPending ? 'Creating...' : 'Create Ticket'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Ticket Detail Dialog - Keep existing implementation */}
-      <Dialog
-        open={!!selectedTicket}
-        onClose={() => setSelectedTicket(null)}
-        maxWidth="md"
-        fullWidth
-      >
+      {/* Ticket Detail Dialog */}
+      <Dialog open={!!selectedTicketId} onClose={() => setSelectedTicketId(null)} maxWidth="md" fullWidth>
         {selectedTicket && (
           <>
             <DialogTitle>
               <Stack direction="row" alignItems="center" justifyContent="space-between">
                 <Stack spacing={1}>
                   <Stack direction="row" alignItems="center" spacing={2}>
-                    <Typography variant="h6" fontWeight={700}>
-                      {selectedTicket.title}
-                    </Typography>
+                    <Typography variant="h6" fontWeight={700}>{selectedTicket.title}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      #{selectedTicket.id}
+                      #{selectedTicket.id.slice(-6).toUpperCase()}
                     </Typography>
                   </Stack>
                   <Stack direction="row" spacing={1}>
-                    <Chip
-                      label={selectedTicket.status}
-                      size="small"
-                      color={getStatusColor(selectedTicket.status)}
-                      icon={getStatusIcon(selectedTicket.status)}
-                    />
-                    <Chip
-                      label={selectedTicket.priority}
-                      size="small"
-                      color={getPriorityColor(selectedTicket.priority)}
-                    />
-                    <Chip
-                      label={selectedTicket.category}
-                      size="small"
-                      variant="outlined"
-                    />
+                    <Chip label={selectedTicket.status} size="small" color={getStatusColor(selectedTicket.status)} icon={getStatusIcon(selectedTicket.status)} />
+                    <Chip label={selectedTicket.priority} size="small" color={getPriorityColor(selectedTicket.priority)} />
+                    <Chip label={selectedTicket.category} size="small" variant="outlined" />
                   </Stack>
                 </Stack>
-                <IconButton onClick={() => setSelectedTicket(null)} size="small">
-                  <X size={20} />
-                </IconButton>
+                <IconButton onClick={() => setSelectedTicketId(null)} size="small"><X size={20} /></IconButton>
               </Stack>
             </DialogTitle>
 
             <DialogContent dividers sx={{ p: 3, maxHeight: '500px', overflow: 'auto' }}>
               <Stack spacing={3}>
-                {/* Messages */}
                 <Stack spacing={2}>
-                  {selectedTicket.messages.map((message) => (
-                    <Stack
-                      key={message.id}
-                      direction="row"
-                      spacing={1.5}
-                      justifyContent={message.sender === 'user' ? 'flex-end' : 'flex-start'}
-                    >
-                      {message.sender !== 'user' && (
-                        <Avatar
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor:
-                              message.sender === 'bot'
-                                ? theme.palette.primary.main
-                                : theme.palette.secondary.main,
-                          }}
-                        >
-                          {message.sender === 'bot' ? (
-                            <Bot size={16} />
-                          ) : (
-                            <User size={16} />
-                          )}
-                        </Avatar>
-                      )}
-                      <Stack spacing={0.5} sx={{ maxWidth: '70%' }}>
-                        <Typography variant="caption" color="text.secondary">
-                          {message.senderName} •{' '}
-                          {format(new Date(message.timestamp), 'MMM dd, HH:mm')}
-                        </Typography>
-                        <Paper
-                          elevation={0}
-                          sx={{
-                            p: 1.5,
-                            backgroundColor:
-                              message.sender === 'user'
-                                ? alpha(theme.palette.primary.main, 0.1)
+                  {(selectedTicket.messages || []).map((message, idx) => {
+                    const isOwn = message.sender === 'user';
+                    return (
+                      <Stack
+                        key={message.id || idx}
+                        direction="row"
+                        spacing={1.5}
+                        justifyContent={isOwn ? 'flex-end' : 'flex-start'}
+                      >
+                        {!isOwn && (
+                          <Avatar
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              bgcolor: message.sender === 'bot' ? theme.palette.primary.main : theme.palette.secondary.main,
+                            }}
+                          >
+                            {message.sender === 'bot' ? <Bot size={16} /> : <User size={16} />}
+                          </Avatar>
+                        )}
+                        <Stack spacing={0.5} sx={{ maxWidth: '70%', alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {message.senderName} • {format(toDate(message.timestamp), 'MMM dd, HH:mm')}
+                          </Typography>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              p: 1.5,
+                              backgroundColor: isOwn
+                                ? alpha(theme.palette.primary.main, 0.15)
                                 : message.sender === 'admin'
                                 ? alpha(theme.palette.secondary.main, 0.1)
                                 : alpha(theme.palette.grey[500], 0.1),
-                            borderRadius: 2,
-                          }}
-                        >
-                          <Typography variant="body2">{message.text}</Typography>
-                        </Paper>
+                              borderRadius: 2,
+                            }}
+                          >
+                            <Typography variant="body2">{message.text}</Typography>
+                          </Paper>
+                        </Stack>
+                        {isOwn && (
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: theme.palette.primary.main }}>
+                            <User size={16} />
+                          </Avatar>
+                        )}
                       </Stack>
-                      {message.sender === 'user' && (
-                        <Avatar
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor: theme.palette.info.main,
-                          }}
-                        >
-                          <User size={16} />
-                        </Avatar>
-                      )}
-                    </Stack>
-                  ))}
+                    );
+                  })}
                 </Stack>
 
-                {/* Feedback Section */}
                 {selectedTicket.feedback && selectedTicket.feedback.length > 0 && (
                   <>
                     <Divider />
                     <Stack spacing={2}>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        Feedback
-                      </Typography>
+                      <Typography variant="subtitle2" fontWeight={600}>Feedback</Typography>
                       {selectedTicket.feedback.map((feedback) => (
                         <FeedbackCard key={feedback.id} feedback={feedback} />
                       ))}
@@ -1094,7 +951,7 @@ const AIHelpDesk = () => {
                 <Button
                   variant="contained"
                   onClick={handleSendTicketReply}
-                  disabled={!replyMessage.trim()}
+                  disabled={!replyMessage.trim() || addMessageMutation.isPending}
                   sx={{ minWidth: 'auto', px: 2 }}
                 >
                   <Send size={20} />

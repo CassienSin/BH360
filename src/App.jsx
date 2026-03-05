@@ -14,6 +14,7 @@ import theme from './theme/theme';
 import { store } from './store';
 import { queryClient } from './api/queryClient';
 import { useAuthPersistence } from './hooks/useAuthPersistence';
+import { LanguageProvider } from './context/LanguageContext';
 import './styles/globals.scss';
 
 // Layouts (keep these as they're always needed)
@@ -23,6 +24,7 @@ import AuthLayout from './components/layout/AuthLayout';
 // Auth Guards (keep these as they're always needed)
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import PublicRoute from './components/auth/PublicRoute';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Lazy load all pages for better performance
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
@@ -33,13 +35,15 @@ const IncidentDetails = lazy(() => import('./pages/Incidents/IncidentDetails'));
 const IncidentCreate = lazy(() => import('./pages/Incidents/IncidentCreate'));
 const TanodManagement = lazy(() => import('./pages/Tanod/TanodManagement'));
 const TaskManagement = lazy(() => import('./pages/Tanod/TaskManagement'));
+const MySchedulePage = lazy(() => import('./pages/Tanod/MySchedulePage'));
 const PerformanceInsights = lazy(() => import('./pages/Tanod/PerformanceInsights'));
 const UserManagement = lazy(() => import('./pages/Users/UserManagement'));
 const AIHelpDesk = lazy(() => import('./pages/HelpDesk/AIHelpDesk'));
 const TicketManagement = lazy(() => import('./pages/HelpDesk/TicketManagement'));
 const Announcements = lazy(() => import('./pages/Announcements/Announcements'));
 const Analytics = lazy(() => import('./pages/Analytics/Analytics'));
-const Profile = lazy(() => import('./pages/Profile/Profile'));
+const Profile  = lazy(() => import('./pages/Profile/Profile'));
+const Settings = lazy(() => import('./pages/Settings/Settings'));
 
 // Create emotion cache with prepend for MUI styles
 const createEmotionCache = () => {
@@ -71,7 +75,9 @@ const AppContent = () => {
   useAuthPersistence();
 
   return (
+    <LanguageProvider>
     <>
+      <ErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Default Route - Redirect to Login */}
@@ -110,6 +116,7 @@ const AppContent = () => {
             <Route path="/incidents/create" element={<IncidentCreate />} />
             <Route path="/incidents/:id" element={<IncidentDetails />} />
             <Route path="/tasks" element={<TaskManagement />} />
+            <Route path="/schedule" element={<MySchedulePage />} />
             <Route path="/tanod" element={<TanodManagement />} />
             <Route path="/tanod/performance" element={<PerformanceInsights />} />
             <Route path="/users" element={<UserManagement />} />
@@ -117,13 +124,15 @@ const AppContent = () => {
             <Route path="/tickets" element={<TicketManagement />} />
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/analytics" element={<Analytics />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile"   element={<Profile />} />
+            <Route path="/settings"  element={<Settings />} />
           </Route>
 
           {/* 404 - Redirect to Login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
+      </ErrorBoundary>
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -136,6 +145,7 @@ const AppContent = () => {
         pauseOnHover
       />
     </>
+    </LanguageProvider>
   );
 };
 

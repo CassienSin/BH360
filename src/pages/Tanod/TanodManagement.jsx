@@ -1,6 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Stack, Typography, Tabs, Tab, Box, Card, CardContent, Grid, Avatar, Chip, IconButton, alpha, Button, CircularProgress, Alert } from '@mui/material';
+import {
+  Stack,
+  Typography,
+  Tabs,
+  Tab,
+  Box,
+  Card,
+  CardContent,
+  Avatar,
+  Chip,
+  IconButton,
+  alpha,
+  Button,
+  Skeleton,
+  Alert,
+} from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Shield, Users, Calendar, Clock, MapPin, AlertCircle, Plus, Edit, Trash2, Brain } from 'lucide-react';
 import { useAllTanods, useAllAttendance, useAllSchedules } from '../../hooks/useTanod';
@@ -11,30 +26,53 @@ import DutyScheduler from '../../components/tanod/DutyScheduler';
 import AttendanceLogger from '../../components/tanod/AttendanceLogger';
 import IncidentResponseLog from '../../components/tanod/IncidentResponseLog';
 import PatrolAreaAssignment from '../../components/tanod/PatrolAreaAssignment';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { toast } from 'react-toastify';
 import { getStatusColor } from '../../utils/tanodFormatters';
+
+// ─── Skeleton for stat cards (Issue #20) ─────────────────────────────────────
+const StatCardSkeleton = () => (
+  <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+    <CardContent>
+      <Stack direction="row" justifyContent="space-between" alignItems="start">
+        <Stack spacing={1}>
+          <Skeleton width={100} height={20} />
+          <Skeleton width={60} height={48} />
+          <Skeleton width={80} height={16} />
+        </Stack>
+        <Skeleton variant="circular" width={56} height={56} />
+      </Stack>
+    </CardContent>
+  </Card>
+);
 
 const TanodManagement = () => {
   const theme = useTheme();
   const navigate = useNavigate();
 
-  // Fetch data from Firebase
   const { data: tanodMembers = [], isLoading: loadingTanods, error: tanodsError } = useAllTanods();
   const { data: dutySchedules = [], isLoading: loadingSchedules } = useAllSchedules();
   const { data: attendanceRecords = [], isLoading: loadingAttendance } = useAllAttendance();
   const { data: allIncidents = [] } = useAllIncidents();
-  
+
   const deleteUser = useDeleteUser();
 
   const [activeTab, setActiveTab] = useState(0);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [selectedTanod, setSelectedTanod] = useState(null);
 
+  // Issue #19: Replace window.confirm with MUI ConfirmDialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [tanodToDelete, setTanodToDelete] = useState(null);
+
   const isLoading = loadingTanods || loadingSchedules || loadingAttendance;
 
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-  };
+  // Issue #23: Update document title
+  useEffect(() => {
+    document.title = 'Tanod Management – BH360';
+  }, []);
+
+  const handleTabChange = (event, newValue) => setActiveTab(newValue);
 
   const handleAddTanod = () => {
     setSelectedTanod(null);
@@ -46,34 +84,37 @@ const TanodManagement = () => {
     setProfileDialogOpen(true);
   };
 
-  const handleDeleteTanod = async (tanodId) => {
-    if (window.confirm('Are you sure you want to delete this tanod member?')) {
-      try {
-        await deleteUser.mutateAsync(tanodId);
-        // Success toast shown by hook
-      } catch (error) {
-        console.error('Error deleting tanod:', error);
-        // Error toast shown by hook
-      }
+  const handleDeleteTanod = (tanodId) => {
+    setTanodToDelete(tanodId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await deleteUser.mutateAsync(tanodToDelete);
+    } catch (error) {
+      console.error('Error deleting tanod:', error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setTanodToDelete(null);
     }
   };
 
-  // Calculate dashboard stats
+  // Dashboard stats
   const totalTanod = tanodMembers.length;
   const activeTanod = tanodMembers.filter((t) => t.status === 'active').length;
   const onDutyTanod = dutySchedules.filter(
-    (s) => s.status === 'in-progress' && new Date(s.date?.toDate ? s.date.toDate() : s.date).toDateString() === new Date().toDateString()
+    (s) =>
+      s.status === 'in-progress' &&
+      new Date(s.date?.toDate ? s.date.toDate() : s.date).toDateString() === new Date().toDateString()
   ).length;
   const todayAttendance = attendanceRecords.filter((a) => {
     const recordDate = a.date?.toDate ? a.date.toDate() : new Date(a.date);
     return recordDate.toDateString() === new Date().toDateString();
   }).length;
   const attendanceRate = totalTanod > 0 ? (todayAttendance / totalTanod) * 100 : 0;
-  
-  // Count incident responses (incidents assigned to tanods)
-  const incidentResponses = allIncidents.filter(inc => inc.assignedTo);
+  const incidentResponses = allIncidents.filter((inc) => inc.assignedTo);
 
-  // Error state
   if (tanodsError) {
     return (
       <Stack spacing={3} className="animate-fade-in">
@@ -88,7 +129,8 @@ const TanodManagement = () => {
     <Stack spacing={3} className="animate-fade-in">
       <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
         <Stack spacing={1}>
-          <Typography variant="h4" fontWeight={700} className="gradient-text">
+          {/* Issue #6: component="h1" */}
+          <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
             Tanod Management System
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -107,137 +149,66 @@ const TanodManagement = () => {
         </Button>
       </Stack>
 
+      {/* Issue #20: Skeleton loaders instead of full-page spinner */}
       {isLoading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-          <CircularProgress />
-        </Box>
+        <>
+          {activeTab === 0 && (
+            <Stack direction="row" spacing={2} flexWrap="wrap">
+              {[0, 1, 2, 3].map((i) => (
+                <Box key={i} sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
+                  <StatCardSkeleton />
+                </Box>
+              ))}
+            </Stack>
+          )}
+          <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+            <Box sx={{ p: 3 }}>
+              <Skeleton height={48} sx={{ mb: 2 }} />
+              <Stack spacing={2}>
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} variant="rounded" height={120} />
+                ))}
+              </Stack>
+            </Box>
+          </Card>
+        </>
       ) : (
         <>
-          {/* Dashboard Stats */}
           {activeTab === 0 && (
-            <>
-              <Stack direction="row" spacing={2} flexWrap="wrap">
-                <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
+            <Stack direction="row" spacing={2} flexWrap="wrap">
+              {[
+                { label: 'Total Tanod', value: totalTanod, sub: `${activeTanod} Active`, color: theme.palette.primary.main, icon: Users },
+                { label: 'On Duty', value: onDutyTanod, sub: 'Currently Active', color: theme.palette.info.main, icon: Shield },
+                { label: 'Attendance Rate', value: `${attendanceRate.toFixed(0)}%`, sub: 'Today', color: theme.palette.success.main, icon: Clock },
+                { label: 'Total Incidents', value: incidentResponses.length, sub: 'Assigned', color: theme.palette.warning.main, icon: AlertCircle },
+              ].map(({ label, value, sub, color, icon: Icon }) => (
+                <Box key={label} sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
                   <Card
                     elevation={0}
                     sx={{
                       borderRadius: 3,
                       border: `1px solid ${theme.palette.divider}`,
-                      background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
+                      background: `linear-gradient(135deg, ${alpha(color, 0.1)} 0%, ${alpha(color, 0.05)} 100%)`,
                     }}
                   >
                     <CardContent>
                       <Stack direction="row" justifyContent="space-between" alignItems="start">
                         <Stack spacing={1}>
-                          <Typography variant="body2" color="text.secondary">
-                            Total Tanod
+                          <Typography variant="body2" color="text.secondary">{label}</Typography>
+                          <Typography variant="h3" fontWeight={700} sx={{ color }}>
+                            {value}
                           </Typography>
-                          <Typography variant="h3" fontWeight={700} color="primary.main">
-                            {totalTanod}
-                          </Typography>
-                          <Typography variant="caption" color="success.main" fontWeight={600}>
-                            {activeTanod} Active
-                          </Typography>
+                          <Typography variant="caption" color="text.secondary">{sub}</Typography>
                         </Stack>
-                        <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.2), width: 56, height: 56 }}>
-                          <Users size={28} color={theme.palette.primary.main} />
+                        <Avatar sx={{ bgcolor: alpha(color, 0.2), width: 56, height: 56 }}>
+                          <Icon size={28} color={color} />
                         </Avatar>
                       </Stack>
                     </CardContent>
                   </Card>
                 </Box>
-
-                <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
-                  <Card
-                    elevation={0}
-                    sx={{
-                      borderRadius: 3,
-                      border: `1px solid ${theme.palette.divider}`,
-                      background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.1)} 0%, ${alpha(theme.palette.info.main, 0.05)} 100%)`,
-                    }}
-                  >
-                    <CardContent>
-                      <Stack direction="row" justifyContent="space-between" alignItems="start">
-                        <Stack spacing={1}>
-                          <Typography variant="body2" color="text.secondary">
-                            On Duty
-                          </Typography>
-                          <Typography variant="h3" fontWeight={700} color="info.main">
-                            {onDutyTanod}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Currently Active
-                          </Typography>
-                        </Stack>
-                        <Avatar sx={{ bgcolor: alpha(theme.palette.info.main, 0.2), width: 56, height: 56 }}>
-                          <Shield size={28} color={theme.palette.info.main} />
-                        </Avatar>
-                      </Stack>
-                    </CardContent>
-                  </Card>
-                </Box>
-
-                <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
-                  <Card
-                    elevation={0}
-                    sx={{
-                      borderRadius: 3,
-                      border: `1px solid ${theme.palette.divider}`,
-                      background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`,
-                    }}
-                  >
-                    <CardContent>
-                      <Stack direction="row" justifyContent="space-between" alignItems="start">
-                        <Stack spacing={1}>
-                          <Typography variant="body2" color="text.secondary">
-                            Attendance Rate
-                          </Typography>
-                          <Typography variant="h3" fontWeight={700} color="success.main">
-                            {attendanceRate.toFixed(0)}%
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Today
-                          </Typography>
-                        </Stack>
-                        <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.2), width: 56, height: 56 }}>
-                          <Clock size={28} color={theme.palette.success.main} />
-                        </Avatar>
-                      </Stack>
-                    </CardContent>
-                  </Card>
-                </Box>
-
-                <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
-                  <Card
-                    elevation={0}
-                    sx={{
-                      borderRadius: 3,
-                      border: `1px solid ${theme.palette.divider}`,
-                      background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.1)} 0%, ${alpha(theme.palette.warning.main, 0.05)} 100%)`,
-                    }}
-                  >
-                    <CardContent>
-                      <Stack direction="row" justifyContent="space-between" alignItems="start">
-                        <Stack spacing={1}>
-                          <Typography variant="body2" color="text.secondary">
-                            Total Incidents
-                          </Typography>
-                          <Typography variant="h3" fontWeight={700} color="warning.main">
-                            {incidentResponses.length}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Assigned
-                          </Typography>
-                        </Stack>
-                        <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.2), width: 56, height: 56 }}>
-                          <AlertCircle size={28} color={theme.palette.warning.main} />
-                        </Avatar>
-                      </Stack>
-                    </CardContent>
-                  </Card>
-                </Box>
-              </Stack>
-            </>
+              ))}
+            </Stack>
           )}
 
           {/* Tabs */}
@@ -247,10 +218,7 @@ const TanodManagement = () => {
               onChange={handleTabChange}
               variant="scrollable"
               scrollButtons="auto"
-              sx={{
-                borderBottom: `1px solid ${theme.palette.divider}`,
-                px: 2,
-              }}
+              sx={{ borderBottom: `1px solid ${theme.palette.divider}`, px: 2 }}
             >
               <Tab label="Tanod Profiles" icon={<Users size={18} />} iconPosition="start" />
               <Tab label="Duty Scheduling" icon={<Calendar size={18} />} iconPosition="start" />
@@ -260,13 +228,10 @@ const TanodManagement = () => {
             </Tabs>
 
             <Box sx={{ p: 3 }}>
-              {/* Tab 0: Tanod Profiles */}
               {activeTab === 0 && (
                 <Stack spacing={3}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h6" fontWeight={600}>
-                      Tanod Members
-                    </Typography>
+                    <Typography variant="h6" fontWeight={600}>Tanod Members</Typography>
                     <Button variant="contained" startIcon={<Plus size={20} />} onClick={handleAddTanod}>
                       Add Tanod
                     </Button>
@@ -284,14 +249,14 @@ const TanodManagement = () => {
                   ) : (
                     <Stack direction="row" spacing={2} flexWrap="wrap">
                       {tanodMembers.map((tanod) => (
-                        <Box key={tanod.id} sx={{ flex: { xs: '1 1 100%', md: '1 1 calc(50% - 8px)', lg: '1 1 calc(33.333% - 11px)' } }}>
+                        <Box
+                          key={tanod.id}
+                          sx={{ flex: { xs: '1 1 100%', md: '1 1 calc(50% - 8px)', lg: '1 1 calc(33.333% - 11px)' } }}
+                        >
                           <Card
                             elevation={0}
                             className="hover-lift"
-                            sx={{
-                              borderRadius: 3,
-                              border: `1px solid ${theme.palette.divider}`,
-                            }}
+                            sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}
                           >
                             <CardContent>
                               <Stack spacing={2}>
@@ -326,7 +291,9 @@ const TanodManagement = () => {
                                   </Typography>
                                   <Typography variant="body2" color="text.secondary">
                                     <strong>Current Shift:</strong>{' '}
-                                    {tanod.currentShift ? tanod.currentShift.charAt(0).toUpperCase() + tanod.currentShift.slice(1) : 'Off'}
+                                    {tanod.currentShift
+                                      ? tanod.currentShift.charAt(0).toUpperCase() + tanod.currentShift.slice(1)
+                                      : 'Off'}
                                   </Typography>
                                   <Typography variant="body2" color="text.secondary">
                                     <strong>Assigned Areas:</strong> {tanod.assignedAreas?.join(', ') || 'None'}
@@ -355,6 +322,7 @@ const TanodManagement = () => {
                                     size="small"
                                     color="error"
                                     onClick={() => handleDeleteTanod(tanod.id)}
+                                    aria-label={`Delete ${tanod.displayName || tanod.firstName}`}
                                     sx={{ border: `1px solid ${theme.palette.divider}` }}
                                     disabled={deleteUser.isPending}
                                   >
@@ -371,30 +339,31 @@ const TanodManagement = () => {
                 </Stack>
               )}
 
-              {/* Tab 1: Duty Scheduling */}
               {activeTab === 1 && <DutyScheduler />}
-
-              {/* Tab 2: Attendance Logs */}
               {activeTab === 2 && <AttendanceLogger />}
-
-              {/* Tab 3: Patrol Areas */}
               {activeTab === 3 && <PatrolAreaAssignment />}
-
-              {/* Tab 4: Incident Responses */}
               {activeTab === 4 && <IncidentResponseLog />}
             </Box>
           </Card>
         </>
       )}
 
-      {/* Tanod Profile Dialog */}
       <TanodProfileDialog
         open={profileDialogOpen}
-        onClose={() => {
-          setProfileDialogOpen(false);
-          setSelectedTanod(null);
-        }}
+        onClose={() => { setProfileDialogOpen(false); setSelectedTanod(null); }}
         tanod={selectedTanod}
+      />
+
+      {/* Issue #19: MUI confirm dialog instead of window.confirm */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => { setDeleteDialogOpen(false); setTanodToDelete(null); }}
+        onConfirm={handleConfirmDelete}
+        title="Delete Tanod Member"
+        message="Are you sure you want to delete this tanod member? This action cannot be undone."
+        confirmLabel="Delete"
+        confirmColor="error"
+        loading={deleteUser.isPending}
       />
     </Stack>
   );

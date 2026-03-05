@@ -1,5 +1,22 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+/**
+ * Convert Firestore Timestamp objects to ISO strings so Redux never stores
+ * non-serializable values (fixes issue #2 / console warnings).
+ */
+const serializeUser = (user) => {
+  if (!user) return null;
+  const out = { ...user };
+  const toISO = (val) => {
+    if (!val) return val;
+    if (typeof val.toDate === 'function') return val.toDate().toISOString();
+    return val;
+  };
+  out.createdAt = toISO(out.createdAt);
+  out.updatedAt = toISO(out.updatedAt);
+  return out;
+};
+
 const initialState = {
   user: null,
   token: null,
@@ -12,7 +29,7 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     setCredentials: (state, action) => {
-      state.user = action.payload.user;
+      state.user = serializeUser(action.payload.user);
       state.token = action.payload.token;
       state.isAuthenticated = true;
     },
@@ -23,7 +40,7 @@ const authSlice = createSlice({
     },
     updateUser: (state, action) => {
       if (state.user) {
-        state.user = { ...state.user, ...action.payload };
+        state.user = serializeUser({ ...state.user, ...action.payload });
       }
     },
     setLoading: (state, action) => {

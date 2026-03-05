@@ -2,7 +2,7 @@
  * Custom React hooks for Firestore operations with TanStack Query
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery as useReactQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import {
   createDocument,
@@ -24,7 +24,7 @@ import {
  * @param {Object} options - React Query options
  */
 export const useDocument = (collectionName, docId, options = {}) => {
-  return useQuery({
+  return useReactQuery({
     queryKey: [collectionName, docId],
     queryFn: () => getDocument(collectionName, docId),
     enabled: !!docId,
@@ -38,7 +38,7 @@ export const useDocument = (collectionName, docId, options = {}) => {
  * @param {Object} options - React Query options
  */
 export const useCollection = (collectionName, options = {}) => {
-  return useQuery({
+  return useReactQuery({
     queryKey: [collectionName],
     queryFn: () => getAllDocuments(collectionName),
     ...options,
@@ -52,10 +52,10 @@ export const useCollection = (collectionName, options = {}) => {
  * @param {Object} queryOptions - Query options (orderBy, limit, etc.)
  * @param {Object} reactQueryOptions - React Query options
  */
-export const useQuery = (collectionName, filters = [], queryOptions = {}, reactQueryOptions = {}) => {
+export const useFirestoreQuery = (collectionName, filters = [], queryOptions = {}, reactQueryOptions = {}) => {
   const queryKey = [collectionName, 'query', JSON.stringify(filters), JSON.stringify(queryOptions)];
   
-  return useQuery({
+  return useReactQuery({
     queryKey,
     queryFn: () => queryDocuments(collectionName, filters, queryOptions),
     ...reactQueryOptions,
@@ -200,7 +200,7 @@ export const useFirestore = (collectionName) => {
 export default {
   useDocument,
   useCollection,
-  useQuery,
+  useFirestoreQuery,
   useDocumentRealtime,
   useCollectionRealtime,
   useCreateDocument,

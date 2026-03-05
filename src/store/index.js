@@ -20,8 +20,16 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        // Ignore these action types
-        ignoredActions: ['persist/PERSIST'],
+        // Ignore these action types (Firestore Timestamps are serialized before dispatch,
+        // but these actions may still carry non-serializable metadata transiently)
+        ignoredActions: [
+          'persist/PERSIST',
+          'auth/setCredentials',
+          'auth/updateUser',
+          'auth/setLoading',
+        ],
+        // Ignore these paths in state so Timestamps that slip through don't cause errors
+        ignoredPaths: ['auth.user.createdAt', 'auth.user.updatedAt'],
       },
     }),
 });

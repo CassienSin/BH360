@@ -4,12 +4,8 @@ import {
   Typography,
   Card,
   CardContent,
-  Grid,
   Box,
   List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
   Avatar,
   Chip,
   Button,
@@ -22,25 +18,28 @@ import {
   FormControl,
   InputLabel,
   alpha,
+  Skeleton,
+  CircularProgress,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { MapPin, Shield, Plus, AlertCircle } from 'lucide-react';
 import { MapContainer, TileLayer, Polygon, Tooltip as MapTooltip } from 'react-leaflet';
-import { useDispatch, useSelector } from 'react-redux';
-import { updatePatrolArea } from '../../store/slices/tanodSlice';
 import { toast } from 'react-toastify';
 import 'leaflet/dist/leaflet.css';
+import { useAllTanods, useAllPatrolAreas, useUpdatePatrolArea } from '../../hooks/useTanod';
 
 const PatrolAreaAssignment = () => {
   const theme = useTheme();
-  const dispatch = useDispatch();
-  const { tanodMembers, patrolAreas } = useSelector((state) => state.tanod);
+
+  const { data: tanodMembers = [], isLoading: loadingTanods } = useAllTanods();
+  const { data: patrolAreas = [], isLoading: loadingAreas } = useAllPatrolAreas();
+  const updateAreaMutation = useUpdatePatrolArea();
 
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedArea, setSelectedArea] = useState(null);
   const [selectedTanodId, setSelectedTanodId] = useState('');
 
-  const activeTanod = tanodMembers.filter((t) => t.status === 'active');
+  const activeTanod = tanodMembers.filter((t) => !t.status || t.status === 'active');
 
   const getPriorityColor = (priority) => {
     const colors = {
@@ -52,51 +51,62 @@ const PatrolAreaAssignment = () => {
   };
 
   const getPolygonColor = (priority) => {
-    const colors = {
-      high: '#EF4444',
-      medium: '#F59E0B',
-      low: '#10B981',
-    };
+    const colors = { high: '#EF4444', medium: '#F59E0B', low: '#10B981' };
     return colors[priority] || '#94A3B8';
   };
 
-  const handleAssignArea = () => {
+  const handleAssignArea = async () => {
     if (!selectedTanodId) {
       toast.error('Please select a tanod member');
       return;
     }
-
-    const updatedArea = {
-      ...selectedArea,
-      assignedTanodIds: [...selectedArea.assignedTanodIds, selectedTanodId],
-    };
-
-    dispatch(updatePatrolArea(updatedArea));
-    toast.success('Patrol area assigned successfully');
-    setOpenDialog(false);
-    setSelectedTanodId('');
+    const currentIds = selectedArea?.assignedTanodIds || [];
+    if (currentIds.includes(selectedTanodId)) {
+      toast.warning('This tanod is already assigned to this area');
+      return;
+    }
+    try {
+      await updateAreaMutation.mutateAsync({
+        areaId: selectedArea.id,
+        updates: { assignedTanodIds: [...currentIds, selectedTanodId] },
+      });
+      setOpenDialog(false);
+      setSelectedTanodId('');
+    } catch (err) {
+      console.error('[PatrolAreaAssignment] assign error:', err);
+    }
   };
 
-  const handleUnassignTanod = (areaId, tanodId) => {
+  const handleUnassignTanod = async (areaId, tanodId) => {
     const area = patrolAreas.find((a) => a.id === areaId);
-    const updatedArea = {
-      ...area,
-      assignedTanodIds: area.assignedTanodIds.filter((id) => id !== tanodId),
-    };
-
-    dispatch(updatePatrolArea(updatedArea));
-    toast.success('Tanod unassigned from patrol area');
+    if (!area) return;
+    try {
+      await updateAreaMutation.mutateAsync({
+        areaId,
+        updates: { assignedTanodIds: (area.assignedTanodIds || []).filter((id) => id !== tanodId) },
+      });
+    } catch (err) {
+      console.error('[PatrolAreaAssignment] unassign error:', err);
+    }
   };
 
-  // Center of the map - average of all coordinates
   const mapCenter = [14.5985, 120.9852];
+
+  if (loadingTanods || loadingAreas) {
+    return (
+      <Stack spacing={3}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3}>
+          <Skeleton variant="rounded" height={560} sx={{ flex: '0 0 58.333%' }} />
+          <Skeleton variant="rounded" height={560} sx={{ flex: 1 }} />
+        </Stack>
+      </Stack>
+    );
+  }
 
   return (
     <Stack spacing={3}>
       <Stack spacing={0.5}>
-        <Typography variant="h5" fontWeight={700}>
-          Patrol Area Assignment
-        </Typography>
+        <Typography variant="h5" fontWeight={700}>Patrol Area Assignment</Typography>
         <Typography variant="body2" color="text.secondary">
           Manage patrol zones and assign tanod members
         </Typography>
@@ -109,76 +119,51 @@ const PatrolAreaAssignment = () => {
             <CardContent>
               <Stack spacing={2}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="h6" fontWeight={600}>
-                    Patrol Areas Map
-                  </Typography>
+                  <Typography variant="h6" fontWeight={600}>Patrol Areas Map</Typography>
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Box
-                      sx={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '50%',
-                        bgcolor: theme.palette.error.main,
-                      }}
-                    />
-                    <Typography variant="caption">High</Typography>
-                    <Box
-                      sx={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '50%',
-                        bgcolor: theme.palette.warning.main,
-                      }}
-                    />
-                    <Typography variant="caption">Medium</Typography>
-                    <Box
-                      sx={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '50%',
-                        bgcolor: theme.palette.success.main,
-                      }}
-                    />
-                    <Typography variant="caption">Low</Typography>
+                    {['error', 'warning', 'success'].map((color, i) => (
+                      <Stack key={color} direction="row" spacing={0.5} alignItems="center">
+                        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: `${color}.main` }} />
+                        <Typography variant="caption">{['High', 'Medium', 'Low'][i]}</Typography>
+                      </Stack>
+                    ))}
                   </Stack>
                 </Stack>
 
                 <Box sx={{ height: 500, borderRadius: 2, overflow: 'hidden' }}>
-                  <MapContainer
-                    center={mapCenter}
-                    zoom={14}
-                    style={{ height: '100%', width: '100%' }}
-                  >
+                  <MapContainer center={mapCenter} zoom={14} style={{ height: '100%', width: '100%' }}>
                     <TileLayer
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     />
-                    {patrolAreas.map((area) => (
-                      <Polygon
-                        key={area.id}
-                        positions={area.coordinates}
-                        pathOptions={{
-                          color: getPolygonColor(area.priority),
-                          fillColor: getPolygonColor(area.priority),
-                          fillOpacity: 0.3,
-                          weight: 2,
-                        }}
-                      >
-                        <MapTooltip>
-                          <Stack spacing={0.5}>
-                            <Typography variant="subtitle2" fontWeight={600}>
-                              {area.name}
-                            </Typography>
-                            <Typography variant="caption">
-                              Priority: {area.priority}
-                            </Typography>
-                            <Typography variant="caption">
-                              Assigned: {area.assignedTanodIds.length} tanod(s)
-                            </Typography>
-                          </Stack>
-                        </MapTooltip>
-                      </Polygon>
-                    ))}
+                    {patrolAreas.map((area) => {
+                      // Convert {lat,lng} objects → [lat,lng] tuples for Leaflet
+                      const positions = (area.coordinates || []).map((c) =>
+                        Array.isArray(c) ? c : [c.lat, c.lng]
+                      );
+                      return (
+                        <Polygon
+                          key={area.id}
+                          positions={positions}
+                          pathOptions={{
+                            color: getPolygonColor(area.priority),
+                            fillColor: getPolygonColor(area.priority),
+                            fillOpacity: 0.3,
+                            weight: 2,
+                          }}
+                        >
+                          <MapTooltip>
+                            <Stack spacing={0.5}>
+                              <Typography variant="subtitle2" fontWeight={600}>{area.name}</Typography>
+                              <Typography variant="caption">Priority: {area.priority}</Typography>
+                              <Typography variant="caption">
+                                Assigned: {(area.assignedTanodIds || []).length} tanod(s)
+                              </Typography>
+                            </Stack>
+                          </MapTooltip>
+                        </Polygon>
+                      );
+                    })}
                   </MapContainer>
                 </Box>
               </Stack>
@@ -190,19 +175,13 @@ const PatrolAreaAssignment = () => {
         <Box sx={{ flex: 1 }}>
           <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
             <CardContent>
-              <Typography variant="h6" fontWeight={600} gutterBottom>
-                Patrol Areas
-              </Typography>
+              <Typography variant="h6" fontWeight={600} gutterBottom>Patrol Areas</Typography>
               <List sx={{ maxHeight: 530, overflow: 'auto' }}>
                 {patrolAreas.map((area) => (
                   <Card
                     key={area.id}
                     elevation={0}
-                    sx={{
-                      mb: 2,
-                      border: `1px solid ${theme.palette.divider}`,
-                      borderRadius: 2,
-                    }}
+                    sx={{ mb: 2, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}
                   >
                     <CardContent>
                       <Stack spacing={2}>
@@ -210,9 +189,7 @@ const PatrolAreaAssignment = () => {
                           <Stack spacing={0.5}>
                             <Stack direction="row" alignItems="center" spacing={1}>
                               <MapPin size={18} color={getPriorityColor(area.priority)} />
-                              <Typography variant="subtitle1" fontWeight={600}>
-                                {area.name}
-                              </Typography>
+                              <Typography variant="subtitle1" fontWeight={600}>{area.name}</Typography>
                             </Stack>
                             <Chip
                               label={`${area.priority} priority`}
@@ -239,12 +216,12 @@ const PatrolAreaAssignment = () => {
                           </Button>
                         </Stack>
 
-                        {area.assignedTanodIds.length > 0 ? (
+                        {(area.assignedTanodIds || []).length > 0 ? (
                           <Stack spacing={1}>
                             <Typography variant="caption" color="text.secondary" fontWeight={600}>
                               Assigned Tanod:
                             </Typography>
-                            {area.assignedTanodIds.map((tanodId) => {
+                            {(area.assignedTanodIds || []).map((tanodId) => {
                               const tanod = tanodMembers.find((t) => t.id === tanodId);
                               return tanod ? (
                                 <Stack
@@ -260,21 +237,19 @@ const PatrolAreaAssignment = () => {
                                   }}
                                 >
                                   <Stack direction="row" alignItems="center" spacing={1}>
-                                    <Avatar
-                                      sx={{
-                                        width: 24,
-                                        height: 24,
-                                        bgcolor: 'primary.main',
-                                        fontSize: '0.75rem',
-                                      }}
-                                    >
+                                    <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
                                       <Shield size={12} />
                                     </Avatar>
-                                    <Typography variant="body2">{tanod.fullName}</Typography>
+                                    <Typography variant="body2">
+                                      {tanod.displayName ||
+                                        tanod.fullName ||
+                                        `${tanod.firstName || ''} ${tanod.lastName || ''}`.trim()}
+                                    </Typography>
                                   </Stack>
                                   <Button
                                     size="small"
                                     color="error"
+                                    disabled={updateAreaMutation.isPending}
                                     onClick={() => handleUnassignTanod(area.id, tanodId)}
                                   >
                                     Remove
@@ -288,17 +263,10 @@ const PatrolAreaAssignment = () => {
                             direction="row"
                             spacing={1}
                             alignItems="center"
-                            sx={{
-                              py: 1,
-                              px: 1.5,
-                              borderRadius: 1,
-                              bgcolor: alpha(theme.palette.warning.main, 0.1),
-                            }}
+                            sx={{ py: 1, px: 1.5, borderRadius: 1, bgcolor: alpha(theme.palette.warning.main, 0.1) }}
                           >
                             <AlertCircle size={16} color={theme.palette.warning.main} />
-                            <Typography variant="body2" color="warning.main">
-                              No tanod assigned
-                            </Typography>
+                            <Typography variant="body2" color="warning.main">No tanod assigned</Typography>
                           </Stack>
                         )}
                       </Stack>
@@ -314,23 +282,16 @@ const PatrolAreaAssignment = () => {
       {/* Assignment Dialog */}
       <Dialog
         open={openDialog}
-        onClose={() => {
-          setOpenDialog(false);
-          setSelectedTanodId('');
-        }}
+        onClose={() => { setOpenDialog(false); setSelectedTanodId(''); }}
         maxWidth="sm"
         fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
         <DialogTitle>
           <Stack spacing={0.5}>
-            <Typography variant="h6" fontWeight={700}>
-              Assign Patrol Area
-            </Typography>
+            <Typography variant="h6" fontWeight={700}>Assign Patrol Area</Typography>
             {selectedArea && (
-              <Typography variant="body2" color="text.secondary">
-                {selectedArea.name}
-              </Typography>
+              <Typography variant="body2" color="text.secondary">{selectedArea.name}</Typography>
             )}
           </Stack>
         </DialogTitle>
@@ -344,10 +305,12 @@ const PatrolAreaAssignment = () => {
                 label="Select Tanod Member"
               >
                 {activeTanod
-                  .filter((tanod) => !selectedArea?.assignedTanodIds.includes(tanod.id))
+                  .filter((tanod) => !(selectedArea?.assignedTanodIds || []).includes(tanod.id))
                   .map((tanod) => (
                     <MenuItem key={tanod.id} value={tanod.id}>
-                      {tanod.fullName}
+                      {tanod.displayName ||
+                        tanod.fullName ||
+                        `${tanod.firstName || ''} ${tanod.lastName || ''}`.trim()}
                     </MenuItem>
                   ))}
               </Select>
@@ -355,17 +318,16 @@ const PatrolAreaAssignment = () => {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button
-            onClick={() => {
-              setOpenDialog(false);
-              setSelectedTanodId('');
-            }}
-            variant="outlined"
-          >
+          <Button onClick={() => { setOpenDialog(false); setSelectedTanodId(''); }} variant="outlined">
             Cancel
           </Button>
-          <Button onClick={handleAssignArea} variant="contained">
-            Assign
+          <Button
+            onClick={handleAssignArea}
+            variant="contained"
+            disabled={updateAreaMutation.isPending}
+            startIcon={updateAreaMutation.isPending ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            {updateAreaMutation.isPending ? 'Assigning…' : 'Assign'}
           </Button>
         </DialogActions>
       </Dialog>

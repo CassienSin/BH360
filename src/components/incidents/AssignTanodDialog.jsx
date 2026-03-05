@@ -99,7 +99,7 @@ const AssignTanodDialog = ({ open, onClose, incident }) => {
 
   // Filter only active tanods and sort by AI recommendation
   const activeTanods = useMemo(() => {
-    const active = filteredTanods.filter((tanod) => tanod.status === 'active');
+    const active = filteredTanods.filter((tanod) => !tanod.status || tanod.status === 'active');
     
     // Sort by AI recommendation (recommended first)
     if (aiSuggestions?.recommendations) {

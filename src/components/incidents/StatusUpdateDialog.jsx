@@ -11,43 +11,43 @@ import {
   Typography,
   Chip,
   alpha,
+  CircularProgress,
   useTheme,
 } from '@mui/material';
-import { CheckCircle2, Clock, AlertCircle } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { CheckCircle2, Clock, AlertCircle, XCircle } from 'lucide-react';
+import { useUpdateIncident } from '../../hooks/useIncidents';
+import { useAppSelector } from '../../store/hooks';
 
-const StatusUpdateDialog = ({ open, onClose, incident, onUpdate }) => {
+const StatusUpdateDialog = ({ open, onClose, incident }) => {
   const theme = useTheme();
+  const { user } = useAppSelector((state) => state.auth);
   const [status, setStatus] = useState(incident?.status || 'submitted');
   const [notes, setNotes] = useState('');
-  const [assignedTo, setAssignedTo] = useState(incident?.assignedTo || '');
+
+  const updateIncidentMutation = useUpdateIncident();
 
   const statusOptions = [
     { value: 'submitted', label: 'Submitted', icon: <AlertCircle size={16} />, color: theme.palette.info.main },
     { value: 'in-progress', label: 'In Progress', icon: <Clock size={16} />, color: theme.palette.warning.main },
     { value: 'resolved', label: 'Resolved', icon: <CheckCircle2 size={16} />, color: theme.palette.success.main },
+    { value: 'rejected', label: 'Rejected', icon: <XCircle size={16} />, color: theme.palette.error.main },
   ];
 
-  const tanodMembers = [
-    'Tanod Pedro Santos',
-    'Tanod Jose Cruz',
-    'Tanod Maria Garcia',
-    'Tanod Juan Reyes',
-  ];
-
-  const handleSubmit = () => {
-    const updateData = {
-      status,
-      notes,
-      assignedTo: assignedTo || null,
-      updatedAt: new Date().toISOString(),
-      updatedBy: 'Admin User', // Replace with actual user
-    };
-
-    onUpdate(updateData);
-    toast.success('Incident status updated successfully');
+  const handleSubmit = async () => {
+    await updateIncidentMutation.mutateAsync({
+      incidentId: incident.id,
+      updates: {
+        status,
+        notes: notes || undefined,
+        updatedBy: user?.uid || user?.email || 'Admin',
+        ...(status === 'resolved' ? { resolvedAt: new Date() } : {}),
+      },
+    });
     onClose();
   };
+
+  const currentStatusColor =
+    statusOptions.find((s) => s.value === status)?.color || theme.palette.grey[500];
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -56,7 +56,7 @@ const StatusUpdateDialog = ({ open, onClose, incident, onUpdate }) => {
           Update Incident Status
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Case #{incident?.id}
+          Case #{incident?.id?.substring(0, 8)}
         </Typography>
       </DialogTitle>
       <DialogContent>
@@ -74,24 +74,6 @@ const StatusUpdateDialog = ({ open, onClose, incident, onUpdate }) => {
                   {option.icon}
                   <Typography>{option.label}</Typography>
                 </Stack>
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <TextField
-            select
-            label="Assign To"
-            value={assignedTo}
-            onChange={(e) => setAssignedTo(e.target.value)}
-            fullWidth
-            helperText="Optional: Assign a Tanod member to this incident"
-          >
-            <MenuItem value="">
-              <em>Unassigned</em>
-            </MenuItem>
-            {tanodMembers.map((member) => (
-              <MenuItem key={member} value={member}>
-                {member}
               </MenuItem>
             ))}
           </TextField>
@@ -130,11 +112,8 @@ const StatusUpdateDialog = ({ open, onClose, incident, onUpdate }) => {
                   size="small"
                   sx={{
                     textTransform: 'capitalize',
-                    backgroundColor: alpha(
-                      statusOptions.find((s) => s.value === status)?.color || theme.palette.grey[500],
-                      0.1
-                    ),
-                    color: statusOptions.find((s) => s.value === status)?.color,
+                    backgroundColor: alpha(currentStatusColor, 0.1),
+                    color: currentStatusColor,
                     fontWeight: 600,
                   }}
                 />
@@ -144,11 +123,16 @@ const StatusUpdateDialog = ({ open, onClose, incident, onUpdate }) => {
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3 }}>
-        <Button onClick={onClose} variant="outlined">
+        <Button onClick={onClose} variant="outlined" disabled={updateIncidentMutation.isPending}>
           Cancel
         </Button>
-        <Button onClick={handleSubmit} variant="contained">
-          Update Status
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
+          disabled={updateIncidentMutation.isPending}
+          startIcon={updateIncidentMutation.isPending ? <CircularProgress size={16} /> : undefined}
+        >
+          {updateIncidentMutation.isPending ? 'Updating...' : 'Update Status'}
         </Button>
       </DialogActions>
     </Dialog>

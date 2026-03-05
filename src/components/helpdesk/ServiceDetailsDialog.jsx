@@ -25,8 +25,6 @@ import { X, FileText, Clock, DollarSign, Calendar, CheckCircle, ChevronDown, Ale
 const ServiceDetailsDialog = ({ open, onClose, service }) => {
   const theme = useTheme();
 
-  if (!service) return null;
-
   const getCategoryColor = (category) => {
     const colors = {
       Certificates: theme.palette.primary.main,
@@ -38,7 +36,7 @@ const ServiceDetailsDialog = ({ open, onClose, service }) => {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
+      {service && (<><DialogTitle>
         <Stack direction="row" alignItems="start" justifyContent="space-between">
           <Stack direction="row" spacing={2} alignItems="center">
             <Box
@@ -295,6 +293,7 @@ const ServiceDetailsDialog = ({ open, onClose, service }) => {
           Start Application
         </Button>
       </DialogActions>
+    </>)}
     </Dialog>
   );
 };

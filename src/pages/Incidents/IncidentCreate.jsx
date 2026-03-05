@@ -40,6 +40,11 @@ const IncidentCreate = () => {
     reporterName: '',
     reporterContact: '',
   });
+  // Issue #23: Update document title
+  useEffect(() => {
+    document.title = 'Report Incident – BH360';
+  }, []);
+
   const [aiClassification, setAiClassification] = useState(null);
   const [aiPriority, setAiPriority] = useState(null);
   const [aiSuggestions, setAiSuggestions] = useState([]);
@@ -135,7 +140,8 @@ const IncidentCreate = () => {
         >
           Back
         </Button>
-        <Typography variant="h4" fontWeight={700}>
+        {/* Issue #6, #13: h1 component + gradient text */}
+        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
           Report New Incident
         </Typography>
       </Stack>
@@ -317,13 +323,25 @@ const IncidentCreate = () => {
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  variant="contained" 
+                 {/* Issue #26: Responsive button text — shorter on mobile */}
+                <Button
+                  type="submit"
+                  variant="contained"
                   startIcon={createIncident.isPending ? <CircularProgress size={18} /> : <Sparkles size={18} />}
                   disabled={createIncident.isPending}
                 >
-                  {createIncident.isPending ? 'Submitting...' : 'Submit Report with AI Analysis'}
+                  {createIncident.isPending ? (
+                    'Submitting…'
+                  ) : (
+                    <>
+                      <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                        Submit Report with AI Analysis
+                      </Box>
+                      <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                        Submit Report
+                      </Box>
+                    </>
+                  )}
                 </Button>
               </Stack>
             </Stack>

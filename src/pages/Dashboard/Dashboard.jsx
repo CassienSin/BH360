@@ -1,42 +1,125 @@
-import { Stack, Typography, Grid, Card, CardContent, Box, alpha, useTheme, CircularProgress, Alert } from '@mui/material';
+import { useMemo, useEffect } from 'react';
+import {
+  Stack,
+  Typography,
+  Card,
+  CardContent,
+  Box,
+  alpha,
+  useTheme,
+  Alert,
+  Skeleton,
+} from '@mui/material';
 import { AlertCircle, Shield, Users, TrendingUp } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { useIncidentStats, useRecentIncidents } from '../../hooks/useIncidents';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import { useIncidentStats, useRecentIncidents, useAllIncidents } from '../../hooks/useIncidents';
 import { useActiveTanods } from '../../hooks/useTanod';
 import { useUserStats } from '../../hooks/useUsers';
-import { format, subMonths, startOfMonth } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import QuickActionsPanel from '../../components/dashboard/QuickActionsPanel';
+import RecentIncidentsTable from '../../components/dashboard/RecentIncidentsTable';
+
+// ─── Skeleton placeholders for CLS reduction (Issue #1) ──────────────────────
+
+const StatCardSkeleton = () => (
+  <Card className="glass">
+    <CardContent>
+      <Stack spacing={2}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Skeleton variant="rounded" width={56} height={56} />
+          <Skeleton width={60} height={20} />
+        </Stack>
+        <Stack spacing={0.5}>
+          <Skeleton variant="text" width={80} height={44} />
+          <Skeleton variant="text" width={130} height={20} />
+        </Stack>
+      </Stack>
+    </CardContent>
+  </Card>
+);
+
+const ChartCardSkeleton = ({ height = 300, rows }) => (
+  <Card className="glass">
+    <CardContent>
+      <Skeleton variant="text" width={220} height={32} sx={{ mb: 2 }} />
+      {rows ? (
+        <Stack spacing={2}>
+          {Array.from({ length: rows }).map((_, i) => (
+            <Stack key={i} spacing={1}>
+              <Stack direction="row" justifyContent="space-between">
+                <Skeleton width={80} height={20} />
+                <Skeleton width={30} height={20} />
+              </Stack>
+              <Skeleton variant="rounded" height={8} />
+            </Stack>
+          ))}
+        </Stack>
+      ) : (
+        <Skeleton variant="rounded" height={height} />
+      )}
+    </CardContent>
+  </Card>
+);
+
+const RecentTableSkeleton = () => (
+  <Card className="glass">
+    <CardContent>
+      <Stack direction="row" justifyContent="space-between" mb={2}>
+        <Skeleton variant="text" width={160} height={32} />
+        <Skeleton width={70} height={20} />
+      </Stack>
+      <Stack spacing={1}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} variant="rounded" height={44} />
+        ))}
+      </Stack>
+    </CardContent>
+  </Card>
+);
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const Dashboard = () => {
   const theme = useTheme();
 
-  // Fetch real-time data from Firebase
+  // Issue #23: Update document title on mount
+  useEffect(() => {
+    document.title = 'Dashboard – BH360';
+  }, []);
+
   const { data: incidentStats, isLoading: loadingIncidents, error: incidentsError } = useIncidentStats();
-  const { data: recentIncidents, isLoading: loadingRecent } = useRecentIncidents(3);
+  const { data: recentIncidents, isLoading: loadingRecent } = useRecentIncidents(5);
   const { data: activeTanods, isLoading: loadingTanods } = useActiveTanods();
   const { data: userStats, isLoading: loadingUsers } = useUserStats();
+  const { data: allIncidents = [] } = useAllIncidents();
 
-  // Loading state
-  const isLoading = loadingIncidents || loadingRecent || loadingTanods || loadingUsers;
+  const isLoading = loadingIncidents || loadingTanods || loadingUsers;
 
-  // Calculate response rate (example calculation)
-  const responseRate = incidentStats 
+  const responseRate = incidentStats
     ? Math.round((incidentStats.resolved / incidentStats.total) * 100) || 0
     : 0;
 
-  // Prepare stats cards data
   const stats = [
     {
       icon: AlertCircle,
       label: 'Total Incidents',
-      value: incidentStats?.total?.toString() || '0',
-      change: `+${incidentStats?.submitted || 0}`,
+      value: incidentStats?.total?.toString() ?? '0',
+      change: `+${incidentStats?.submitted ?? 0}`,
       color: theme.palette.primary.main,
       bgColor: alpha(theme.palette.primary.main, 0.1),
     },
     {
       icon: Shield,
       label: 'Active Tanods',
-      value: activeTanods?.length?.toString() || '0',
+      value: activeTanods?.length?.toString() ?? '0',
       change: 'On duty',
       color: theme.palette.success.main,
       bgColor: alpha(theme.palette.success.main, 0.1),
@@ -44,8 +127,8 @@ const Dashboard = () => {
     {
       icon: Users,
       label: 'Registered Users',
-      value: userStats?.total?.toString() || '0',
-      change: `${userStats?.residents || 0} residents`,
+      value: userStats?.total?.toString() ?? '0',
+      change: `${userStats?.residents ?? 0} residents`,
       color: theme.palette.info.main,
       bgColor: alpha(theme.palette.info.main, 0.1),
     },
@@ -53,55 +136,37 @@ const Dashboard = () => {
       icon: TrendingUp,
       label: 'Response Rate',
       value: `${responseRate}%`,
-      change: `${incidentStats?.resolved || 0} resolved`,
+      change: `${incidentStats?.resolved ?? 0} resolved`,
       color: theme.palette.warning.main,
       bgColor: alpha(theme.palette.warning.main, 0.1),
     },
   ];
 
-  // Generate mock trend data (you can replace this with actual historical data)
-  const generateTrendData = () => {
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const date = subMonths(new Date(), i);
-      months.push({
-        month: format(date, 'MMM'),
-        incidents: Math.floor(Math.random() * 20) + 10,
-      });
-    }
-    return months;
-  };
+  const trendData = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const monthDate = subMonths(now, 5 - i);
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const count = allIncidents.filter((incident) => {
+        const created = incident.createdAt?.toDate
+          ? incident.createdAt.toDate()
+          : new Date(incident.createdAt);
+        return created >= monthStart && created <= monthEnd;
+      }).length;
+      return { month: format(monthDate, 'MMM'), incidents: count };
+    });
+  }, [allIncidents]);
 
-  const trendData = generateTrendData();
-
-  // Prepare category data
   const categoryData = [
-    { label: 'Submitted', count: incidentStats?.submitted || 0, color: theme.palette.info.main },
-    { label: 'In Progress', count: incidentStats?.inProgress || 0, color: theme.palette.warning.main },
-    { label: 'Resolved', count: incidentStats?.resolved || 0, color: theme.palette.success.main },
-    { label: 'Rejected', count: incidentStats?.rejected || 0, color: theme.palette.error.main },
+    { label: 'Submitted', count: incidentStats?.submitted ?? 0, color: theme.palette.info.main },
+    { label: 'In Progress', count: incidentStats?.inProgress ?? 0, color: theme.palette.warning.main },
+    { label: 'Resolved', count: incidentStats?.resolved ?? 0, color: theme.palette.success.main },
+    { label: 'Rejected', count: incidentStats?.rejected ?? 0, color: theme.palette.error.main },
   ];
 
-  const maxCount = Math.max(...categoryData.map(c => c.count), 1);
+  const maxCount = Math.max(...categoryData.map((c) => c.count), 1);
 
-  // Format incident status for display
-  const formatStatus = (status) => {
-    return status?.replace('-', ' ') || 'unknown';
-  };
-
-  // Format timestamp
-  const formatTime = (timestamp) => {
-    if (!timestamp) return 'Unknown';
-    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
-    const now = new Date();
-    const diff = Math.floor((now - date) / 1000 / 60); // minutes
-    
-    if (diff < 60) return `${diff} minutes ago`;
-    if (diff < 1440) return `${Math.floor(diff / 60)} hours ago`;
-    return `${Math.floor(diff / 1440)} days ago`;
-  };
-
-  // Error state
   if (incidentsError) {
     return (
       <Stack spacing={3} className="animate-fade-in">
@@ -113,9 +178,10 @@ const Dashboard = () => {
   }
 
   return (
-    <Stack spacing={3} className="animate-fade-in">
+    <Stack spacing={3}>
+      {/* ── Page heading — Issue #6: component="h1" ── */}
       <Stack spacing={1}>
-        <Typography variant="h4" fontWeight={700} className="gradient-text">
+        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
           Dashboard
         </Typography>
         <Typography variant="body2" color="text.secondary">
@@ -123,75 +189,96 @@ const Dashboard = () => {
         </Typography>
       </Stack>
 
+      {/* ── Quick Actions (role-gated shortcuts) ── */}
+      <QuickActionsPanel />
+
+      {/* ── Issue #1: Skeleton instead of full-page spinner ── */}
       {isLoading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-          <CircularProgress />
-        </Box>
+        <>
+          {/* Stat card skeletons — 2-col on mobile, 4-col on desktop */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+              gap: 3,
+            }}
+          >
+            {[0, 1, 2, 3].map((i) => (
+              <StatCardSkeleton key={i} />
+            ))}
+          </Box>
+
+          {/* Chart skeletons */}
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+            <Box sx={{ flex: { xs: 1, md: 2 } }}>
+              <ChartCardSkeleton height={300} />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <ChartCardSkeleton rows={4} />
+            </Box>
+          </Stack>
+
+          {/* Recent incidents table skeleton */}
+          <RecentTableSkeleton />
+        </>
       ) : (
         <>
-          {/* Stats Cards */}
-          <Stack direction="row" spacing={3} flexWrap="wrap">
+          {/* ── Stat Cards — 2-col on mobile, 4-col on desktop ── */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+              gap: 3,
+            }}
+          >
             {stats.map((stat, index) => {
               const Icon = stat.icon;
               return (
-                <Box key={stat.label} sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(25% - 18px)' } }}>
-                  <Card
-                    className="glass hover-lift"
-                    sx={{
-                      height: '100%',
-                      animation: `fadeIn 0.5s ease-out ${index * 0.1}s both`,
-                    }}
-                  >
-                    <CardContent>
-                      <Stack spacing={2}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 2,
-                              backgroundColor: stat.bgColor,
-                              display: 'inline-flex',
-                            }}
-                          >
-                            <Icon size={24} color={stat.color} />
-                          </Box>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              color: 'text.secondary',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {stat.change}
-                          </Typography>
-                        </Stack>
-                        <Stack spacing={0.5}>
-                          <Typography variant="h4" fontWeight={700}>
-                            {stat.value}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {stat.label}
-                          </Typography>
-                        </Stack>
+                // Stat cards are not clickable — no hover-lift (Issue #17)
+                <Card
+                  key={stat.label}
+                  className="glass"
+                  sx={{ animation: `fadeIn 0.5s ease-out ${index * 0.1}s both` }}
+                >
+                  <CardContent>
+                    <Stack spacing={2}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                        <Box
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 2,
+                            backgroundColor: stat.bgColor,
+                            display: 'inline-flex',
+                          }}
+                        >
+                          <Icon size={24} color={stat.color} />
+                        </Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                          {stat.change}
+                        </Typography>
                       </Stack>
-                    </CardContent>
-                  </Card>
-                </Box>
+                      <Stack spacing={0.5}>
+                        <Typography variant="h4" fontWeight={700}>
+                          {stat.value}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {stat.label}
+                        </Typography>
+                      </Stack>
+                    </Stack>
+                  </CardContent>
+                </Card>
               );
             })}
-          </Stack>
+          </Box>
 
-          {/* Charts */}
+          {/* ── Charts — Issue #7: h5 headings to avoid heading level skip ── */}
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+            {/* Line Chart */}
             <Box sx={{ flex: { xs: 1, md: 2 } }}>
-              <Card
-                className="glass hover-lift"
-                sx={{
-                  animation: 'fadeIn 0.6s ease-out',
-                }}
-              >
+              <Card className="glass" sx={{ animation: 'fadeIn 0.6s ease-out' }}>
                 <CardContent>
-                  <Typography variant="h6" fontWeight={600} mb={2}>
+                  <Typography variant="h5" fontWeight={600} mb={2}>
                     Incident Trends (Last 6 Months)
                   </Typography>
                   <ResponsiveContainer width="100%" height={300}>
@@ -213,16 +300,11 @@ const Dashboard = () => {
               </Card>
             </Box>
 
+            {/* Status breakdown */}
             <Box sx={{ flex: 1 }}>
-              <Card
-                className="glass hover-lift"
-                sx={{
-                  height: '100%',
-                  animation: 'fadeIn 0.7s ease-out',
-                }}
-              >
+              <Card className="glass" sx={{ height: '100%', animation: 'fadeIn 0.7s ease-out' }}>
                 <CardContent>
-                  <Typography variant="h6" fontWeight={600} mb={2}>
+                  <Typography variant="h5" fontWeight={600} mb={2}>
                     Incident Status
                   </Typography>
                   <Stack spacing={2}>
@@ -254,6 +336,7 @@ const Dashboard = () => {
                               width: `${(item.count / maxCount) * 100}%`,
                               backgroundColor: item.color,
                               borderRadius: 1,
+                              transition: 'width 0.6s ease-out',
                             }}
                           />
                         </Box>
@@ -265,56 +348,12 @@ const Dashboard = () => {
             </Box>
           </Stack>
 
-          {/* Recent Incidents */}
-          <Card
-            className="glass hover-lift"
-            sx={{
-              animation: 'fadeIn 0.8s ease-out',
-            }}
-          >
-            <CardContent>
-              <Typography variant="h6" fontWeight={600} mb={2}>
-                Recent Incidents
-              </Typography>
-              {recentIncidents && recentIncidents.length > 0 ? (
-                <Stack spacing={2}>
-                  {recentIncidents.map((incident) => (
-                    <Stack
-                      key={incident.id}
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                      sx={{
-                        p: 2,
-                        borderRadius: 2,
-                        backgroundColor: alpha(theme.palette.grey[100], 0.5),
-                      }}
-                    >
-                      <Stack spacing={0.5}>
-                        <Typography variant="body1" fontWeight={500}>
-                          {incident.title || incident.description || 'Untitled Incident'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatTime(incident.createdAt)}
-                        </Typography>
-                      </Stack>
-                      <Box
-                        className={`status-badge ${incident.status}`}
-                      >
-                        {formatStatus(incident.status)}
-                      </Box>
-                    </Stack>
-                  ))}
-                </Stack>
-              ) : (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No recent incidents
-                  </Typography>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
+          {/* ── Recent Incidents Table — replaces stack-based layout ── */}
+          <RecentIncidentsTable
+            incidents={recentIncidents ?? []}
+            isLoading={loadingRecent}
+            limit={5}
+          />
         </>
       )}
     </Stack>
