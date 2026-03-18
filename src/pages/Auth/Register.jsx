@@ -33,7 +33,7 @@ const Register = () => {
 
   // Issue #23: Update document title
   useEffect(() => {
-    document.title = 'Create Account – BH360';
+    document.title = 'Create Account';
   }, []);
 
   const handleChange = (field) => (e) => {

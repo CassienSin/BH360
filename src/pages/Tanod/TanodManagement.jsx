@@ -153,13 +153,11 @@ const TanodManagement = () => {
       {isLoading ? (
         <>
           {activeTab === 0 && (
-            <Stack direction="row" spacing={2} flexWrap="wrap">
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
               {[0, 1, 2, 3].map((i) => (
-                <Box key={i} sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
-                  <StatCardSkeleton />
-                </Box>
+                <StatCardSkeleton key={i} />
               ))}
-            </Stack>
+            </Box>
           )}
           <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
             <Box sx={{ p: 3 }}>
@@ -175,40 +173,39 @@ const TanodManagement = () => {
       ) : (
         <>
           {activeTab === 0 && (
-            <Stack direction="row" spacing={2} flexWrap="wrap">
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
               {[
                 { label: 'Total Tanod', value: totalTanod, sub: `${activeTanod} Active`, color: theme.palette.primary.main, icon: Users },
                 { label: 'On Duty', value: onDutyTanod, sub: 'Currently Active', color: theme.palette.info.main, icon: Shield },
-                { label: 'Attendance Rate', value: `${attendanceRate.toFixed(0)}%`, sub: 'Today', color: theme.palette.success.main, icon: Clock },
-                { label: 'Total Incidents', value: incidentResponses.length, sub: 'Assigned', color: theme.palette.warning.main, icon: AlertCircle },
+                { label: 'Attendance', value: `${attendanceRate.toFixed(0)}%`, sub: 'Today', color: theme.palette.success.main, icon: Clock },
+                { label: 'Incidents', value: incidentResponses.length, sub: 'Assigned', color: theme.palette.warning.main, icon: AlertCircle },
               ].map(({ label, value, sub, color, icon: Icon }) => (
-                <Box key={label} sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
-                  <Card
-                    elevation={0}
-                    sx={{
-                      borderRadius: 3,
-                      border: `1px solid ${theme.palette.divider}`,
-                      background: `linear-gradient(135deg, ${alpha(color, 0.1)} 0%, ${alpha(color, 0.05)} 100%)`,
-                    }}
-                  >
-                    <CardContent>
-                      <Stack direction="row" justifyContent="space-between" alignItems="start">
-                        <Stack spacing={1}>
-                          <Typography variant="body2" color="text.secondary">{label}</Typography>
-                          <Typography variant="h3" fontWeight={700} sx={{ color }}>
-                            {value}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">{sub}</Typography>
-                        </Stack>
-                        <Avatar sx={{ bgcolor: alpha(color, 0.2), width: 56, height: 56 }}>
-                          <Icon size={28} color={color} />
-                        </Avatar>
+                <Card
+                  key={label}
+                  elevation={0}
+                  sx={{
+                    borderRadius: 3,
+                    border: `1px solid ${theme.palette.divider}`,
+                    background: `linear-gradient(135deg, ${alpha(color, 0.1)} 0%, ${alpha(color, 0.05)} 100%)`,
+                  }}
+                >
+                  <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="start">
+                      <Stack spacing={0.5}>
+                        <Typography variant="body2" color="text.secondary" noWrap sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{label}</Typography>
+                        <Typography variant="h4" fontWeight={700} sx={{ color, fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
+                          {value}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>{sub}</Typography>
                       </Stack>
-                    </CardContent>
-                  </Card>
-                </Box>
+                      <Avatar sx={{ bgcolor: alpha(color, 0.2), width: { xs: 40, sm: 56 }, height: { xs: 40, sm: 56 }, flexShrink: 0 }}>
+                        <Icon size={20} color={color} />
+                      </Avatar>
+                    </Stack>
+                  </CardContent>
+                </Card>
               ))}
-            </Stack>
+            </Box>
           )}
 
           {/* Tabs */}

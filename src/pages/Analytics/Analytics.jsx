@@ -263,7 +263,7 @@ const Analytics = () => {
               <BarChart data={locationData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                 <XAxis type="number" stroke={theme.palette.text.secondary} />
-                <YAxis type="category" dataKey="name" stroke={theme.palette.text.secondary} width={150} />
+                <YAxis type="category" dataKey="name" stroke={theme.palette.text.secondary} width={100} tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Bar dataKey="value" fill={theme.palette.secondary.main} radius={[0, 8, 8, 0]} />
               </BarChart>
@@ -276,32 +276,33 @@ const Analytics = () => {
       {trendData && (
         <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
           <CardContent>
-            <Tabs 
+          <Tabs 
               value={activeTab} 
               onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
               sx={{ 
                 borderBottom: 1, 
                 borderColor: 'divider',
-                mb: 3
+                mb: 3,
+                '& .MuiTab-root': { fontWeight: 600, minWidth: { xs: 'auto', sm: 'unset' }, px: { xs: 1.5, sm: 2 } },
               }}
             >
               <Tab 
                 icon={<Sparkles size={18} />} 
                 iconPosition="start"
                 label="Trend Analysis" 
-                sx={{ fontWeight: 600 }}
               />
               <Tab 
                 icon={<LineChartIcon size={18} />} 
                 iconPosition="start"
-                label="Predictive Analytics" 
-                sx={{ fontWeight: 600 }}
+                label="Predictive"
               />
               <Tab 
                 icon={<MapPin size={18} />} 
                 iconPosition="start"
-                label="Hotspot Analysis" 
-                sx={{ fontWeight: 600 }}
+                label="Hotspots"
               />
             </Tabs>
 
@@ -313,99 +314,33 @@ const Analytics = () => {
       )}
 
       {/* Statistics Summary */}
-      <Stack direction="row" spacing={2} flexWrap="wrap">
-        <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+        {[
+          { label: 'Total Incidents', value: incidents.length, color: 'primary' },
+          { label: 'Resolved', value: incidents.filter((i) => i.status === 'resolved').length, color: 'success' },
+          { label: 'In Progress', value: incidents.filter((i) => i.status === 'in-progress').length, color: 'warning' },
+          { label: 'Pending', value: incidents.filter((i) => i.status === 'submitted').length, color: 'info' },
+        ].map(({ label, value, color }) => (
           <Card
+            key={label}
             elevation={0}
             sx={{
               borderRadius: 3,
               border: `1px solid ${theme.palette.divider}`,
-              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(
-                theme.palette.primary.main,
-                0.05
-              )} 100%)`,
+              background: `linear-gradient(135deg, ${alpha(theme.palette[color].main, 0.1)} 0%, ${alpha(theme.palette[color].main, 0.05)} 100%)`,
             }}
           >
-            <CardContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Total Incidents
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom noWrap>
+                {label}
               </Typography>
-              <Typography variant="h3" fontWeight={700} color="primary.main">
-                {incidents.length}
+              <Typography variant="h4" fontWeight={700} color={`${color}.main`} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
+                {value}
               </Typography>
             </CardContent>
           </Card>
-        </Box>
-
-        <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
-          <Card
-            elevation={0}
-            sx={{
-              borderRadius: 3,
-              border: `1px solid ${theme.palette.divider}`,
-              background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(
-                theme.palette.success.main,
-                0.05
-              )} 100%)`,
-            }}
-          >
-            <CardContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Resolved
-              </Typography>
-              <Typography variant="h3" fontWeight={700} color="success.main">
-                {incidents.filter((i) => i.status === 'resolved').length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
-
-        <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
-          <Card
-            elevation={0}
-            sx={{
-              borderRadius: 3,
-              border: `1px solid ${theme.palette.divider}`,
-              background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.1)} 0%, ${alpha(
-                theme.palette.warning.main,
-                0.05
-              )} 100%)`,
-            }}
-          >
-            <CardContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                In Progress
-              </Typography>
-              <Typography variant="h3" fontWeight={700} color="warning.main">
-                {incidents.filter((i) => i.status === 'in-progress').length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
-
-        <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' } }}>
-          <Card
-            elevation={0}
-            sx={{
-              borderRadius: 3,
-              border: `1px solid ${theme.palette.divider}`,
-              background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.1)} 0%, ${alpha(
-                theme.palette.info.main,
-                0.05
-              )} 100%)`,
-            }}
-          >
-            <CardContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Pending
-              </Typography>
-              <Typography variant="h3" fontWeight={700} color="info.main">
-                {incidents.filter((i) => i.status === 'submitted').length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
-      </Stack>
+        ))}
+      </Box>
     </Stack>
   );
 };

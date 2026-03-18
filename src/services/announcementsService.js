@@ -3,6 +3,15 @@
  * Firebase operations for announcement management
  */
 
+import { USE_MOCK_DATA } from '../mocks/mockConfig';
+import { mockAnnouncements } from '../mocks/mockData';
+
+// ─── mock write no-op ────────────────────────────────────────────────────────
+const mockWrite = (label) => {
+  console.info(`[MOCK] ${label} — write skipped (USE_MOCK_DATA=true)`);
+  return Promise.resolve('mock-id');
+};
+
 import {
   createDocument,
   getDocument,
@@ -22,6 +31,7 @@ const ANNOUNCEMENTS_COLLECTION = 'announcements';
  * @returns {Promise<string>} Document ID
  */
 export const createAnnouncement = async (announcementData) => {
+  if (USE_MOCK_DATA) return mockWrite('createAnnouncement');
   const announcement = {
     ...announcementData,
     status: announcementData.status || 'published',
@@ -38,6 +48,7 @@ export const createAnnouncement = async (announcementData) => {
  * @returns {Promise<Object>} Announcement data
  */
 export const getAnnouncement = async (announcementId) => {
+  if (USE_MOCK_DATA) return mockAnnouncements.find((a) => a.id === announcementId) ?? null;
   return await getDocument(ANNOUNCEMENTS_COLLECTION, announcementId);
 };
 
@@ -46,6 +57,8 @@ export const getAnnouncement = async (announcementId) => {
  * @returns {Promise<Array>} Array of announcements
  */
 export const getAllAnnouncements = async () => {
+  if (USE_MOCK_DATA)
+    return [...mockAnnouncements].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return await queryDocuments(
     ANNOUNCEMENTS_COLLECTION,
     [],
@@ -59,6 +72,11 @@ export const getAllAnnouncements = async () => {
  * @returns {Promise<Array>} Array of announcements
  */
 export const getPublishedAnnouncements = async (limit = 50) => {
+  if (USE_MOCK_DATA)
+    return [...mockAnnouncements]
+      .filter((a) => a.status === 'published')
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, limit);
   return await queryDocuments(
     ANNOUNCEMENTS_COLLECTION,
     [{ field: 'status', operator: '==', value: 'published' }],
@@ -88,6 +106,7 @@ export const getAnnouncementsByCategory = async (category) => {
  * @param {Object} updates - Fields to update
  */
 export const updateAnnouncement = async (announcementId, updates) => {
+  if (USE_MOCK_DATA) return mockWrite('updateAnnouncement');
   return await updateDocument(ANNOUNCEMENTS_COLLECTION, announcementId, updates);
 };
 
@@ -119,6 +138,7 @@ export const toggleLike = async (announcementId, isLiked) => {
  * @param {string} announcementId - Announcement ID
  */
 export const deleteAnnouncement = async (announcementId) => {
+  if (USE_MOCK_DATA) return mockWrite('deleteAnnouncement');
   return await deleteDocument(ANNOUNCEMENTS_COLLECTION, announcementId);
 };
 

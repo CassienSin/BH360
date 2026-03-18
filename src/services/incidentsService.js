@@ -3,6 +3,18 @@
  * Firebase operations for incident management
  */
 
+import { USE_MOCK_DATA } from '../mocks/mockConfig';
+import {
+  mockIncidents,
+  mockIncidentStats,
+} from '../mocks/mockData';
+
+// ─── mock write no-op ────────────────────────────────────────────────────────
+const mockWrite = (label) => {
+  console.info(`[MOCK] ${label} — write skipped (USE_MOCK_DATA=true)`);
+  return Promise.resolve('mock-id');
+};
+
 import {
   createDocument,
   getDocument,
@@ -20,6 +32,7 @@ import {
  * @returns {Promise<string>} Document ID
  */
 export const createIncident = async (incidentData) => {
+  if (USE_MOCK_DATA) return mockWrite('createIncident');
   const incident = {
     ...incidentData,
     status: incidentData.status || 'submitted',
@@ -37,6 +50,7 @@ export const createIncident = async (incidentData) => {
  * @returns {Promise<Object>} Incident data
  */
 export const getIncident = async (incidentId) => {
+  if (USE_MOCK_DATA) return mockIncidents.find((i) => i.id === incidentId) ?? null;
   return await getDocument(COLLECTIONS.INCIDENTS, incidentId);
 };
 
@@ -45,6 +59,7 @@ export const getIncident = async (incidentId) => {
  * @returns {Promise<Array>} Array of incidents
  */
 export const getAllIncidents = async () => {
+  if (USE_MOCK_DATA) return [...mockIncidents];
   return await getAllDocuments(COLLECTIONS.INCIDENTS);
 };
 
@@ -118,6 +133,10 @@ export const getIncidentsByTanod = async (tanodId) => {
  * @returns {Promise<Array>} Array of incidents
  */
 export const getRecentIncidents = async (limit = 10) => {
+  if (USE_MOCK_DATA)
+    return [...mockIncidents]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, limit);
   return await queryDocuments(
     COLLECTIONS.INCIDENTS,
     [],
@@ -134,6 +153,7 @@ export const getRecentIncidents = async (limit = 10) => {
  * @param {Object} updates - Fields to update
  */
 export const updateIncident = async (incidentId, updates) => {
+  if (USE_MOCK_DATA) return mockWrite('updateIncident');
   return await updateDocument(COLLECTIONS.INCIDENTS, incidentId, updates);
 };
 
@@ -143,6 +163,7 @@ export const updateIncident = async (incidentId, updates) => {
  * @param {string} tanodId - Tanod user ID
  */
 export const assignIncident = async (incidentId, tanodId) => {
+  if (USE_MOCK_DATA) return mockWrite('assignIncident');
   return await updateDocument(COLLECTIONS.INCIDENTS, incidentId, {
     assignedTo: tanodId,
     status: 'in-progress',
@@ -155,6 +176,7 @@ export const assignIncident = async (incidentId, tanodId) => {
  * @param {Object} resolution - Resolution details
  */
 export const resolveIncident = async (incidentId, resolution = {}) => {
+  if (USE_MOCK_DATA) return mockWrite('resolveIncident');
   return await updateDocument(COLLECTIONS.INCIDENTS, incidentId, {
     status: 'resolved',
     resolvedAt: new Date(),
@@ -167,6 +189,7 @@ export const resolveIncident = async (incidentId, resolution = {}) => {
  * @param {string} incidentId - Incident ID
  */
 export const deleteIncident = async (incidentId) => {
+  if (USE_MOCK_DATA) return mockWrite('deleteIncident');
   return await deleteDocument(COLLECTIONS.INCIDENTS, incidentId);
 };
 
@@ -190,6 +213,7 @@ export const subscribeToIncidents = (filters = [], callback) => {
  * @returns {Promise<Object>} Statistics object
  */
 export const getIncidentStats = async () => {
+  if (USE_MOCK_DATA) return { ...mockIncidentStats };
   const allIncidents = await getAllIncidents();
   
   return {

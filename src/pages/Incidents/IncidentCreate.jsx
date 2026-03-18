@@ -132,16 +132,24 @@ const IncidentCreate = () => {
 
   return (
     <Stack spacing={3}>
-      <Stack direction="row" alignItems="center" spacing={2}>
+      <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
         <Button
           variant="outlined"
-          startIcon={<ArrowLeft size={20} />}
+          startIcon={<ArrowLeft size={18} />}
+          size="small"
           onClick={() => navigate('/incidents')}
+          sx={{ flexShrink: 0 }}
         >
           Back
         </Button>
         {/* Issue #6, #13: h1 component + gradient text */}
-        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
+        <Typography
+          variant="h4"
+          component="h1"
+          fontWeight={700}
+          className="gradient-text"
+          sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem', md: '2.125rem' } }}
+        >
           Report New Incident
         </Typography>
       </Stack>

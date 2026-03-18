@@ -154,7 +154,7 @@ const Announcements = () => {
 
   return (
     <Stack spacing={3} className="animate-fade-in">
-      <Stack direction="row" justifyContent="space-between" alignItems="start" spacing={2}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2}>
         <Stack spacing={1}>
           <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
             Announcements
@@ -167,11 +167,12 @@ const Announcements = () => {
         {isAdmin && (
           <Button
             variant="contained"
-            startIcon={<Plus size={20} />}
+            startIcon={<Plus size={18} />}
             onClick={() => setOpenCreateDialog(true)}
-            sx={{ boxShadow: '0px 4px 12px rgba(99, 102, 241, 0.3)', flexShrink: 0 }}
+            sx={{ boxShadow: '0px 4px 12px rgba(99, 102, 241, 0.3)', flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'auto' } }}
           >
-            Create Announcement
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Create Announcement</Box>
+            <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>Create</Box>
           </Button>
         )}
       </Stack>

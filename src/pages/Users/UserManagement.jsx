@@ -313,12 +313,13 @@ const UserManagement = () => {
       </Stack>
 
       {/* ── Toolbar ── */}
-      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
         <TextField
           placeholder="Search by name or email…"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           size="small"
+          fullWidth
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -326,10 +327,10 @@ const UserManagement = () => {
               </InputAdornment>
             ),
           }}
-          sx={{ maxWidth: 380, flex: 1 }}
+          sx={{ flex: 1 }}
         />
 
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+        <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 160 }, flexShrink: 0 }}>
           <InputLabel>Role Filter</InputLabel>
           <Select
             value={roleFilter}

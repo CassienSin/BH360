@@ -6,7 +6,6 @@ import { ThemeProvider } from '@mui/material/styles';
 import { CacheProvider } from '@emotion/react';
 import createCache from '@emotion/cache';
 import CssBaseline from '@mui/material/CssBaseline';
-import { CircularProgress, Box } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -25,6 +24,7 @@ import AuthLayout from './components/layout/AuthLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import PublicRoute from './components/auth/PublicRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import LoadingScreen from './components/common/LoadingScreen';
 
 // Lazy load all pages for better performance
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
@@ -56,19 +56,7 @@ const createEmotionCache = () => {
 const emotionCache = createEmotionCache();
 
 // Loading fallback component
-const PageLoader = () => (
-  <Box
-    sx={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #F8FAFC 0%, #E0E7FF 50%, #FECDD3 100%)',
-    }}
-  >
-    <CircularProgress size={48} />
-  </Box>
-);
+const PageLoader = () => <LoadingScreen message="Loading page..." />;
 
 // Auth persistence component
 const AppContent = () => {

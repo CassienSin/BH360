@@ -26,6 +26,7 @@ import { useUserStats } from '../../hooks/useUsers';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import QuickActionsPanel from '../../components/dashboard/QuickActionsPanel';
 import RecentIncidentsTable from '../../components/dashboard/RecentIncidentsTable';
+import RequestsOverviewPanel from '../../components/dashboard/RequestsOverviewPanel';
 
 // ─── Skeleton placeholders for CLS reduction (Issue #1) ──────────────────────
 
@@ -200,7 +201,7 @@ const Dashboard = () => {
             sx={{
               display: 'grid',
               gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 3,
+              gap: { xs: 1.5, sm: 3 },
             }}
           >
             {[0, 1, 2, 3].map((i) => (
@@ -228,7 +229,7 @@ const Dashboard = () => {
             sx={{
               display: 'grid',
               gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 3,
+              gap: { xs: 1.5, sm: 3 },
             }}
           >
             {stats.map((stat, index) => {
@@ -240,28 +241,28 @@ const Dashboard = () => {
                   className="glass"
                   sx={{ animation: `fadeIn 0.5s ease-out ${index * 0.1}s both` }}
                 >
-                  <CardContent>
-                    <Stack spacing={2}>
+                  <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+                    <Stack spacing={{ xs: 1, sm: 2 }}>
                       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                         <Box
                           sx={{
-                            p: 1.5,
+                            p: { xs: 1, sm: 1.5 },
                             borderRadius: 2,
                             backgroundColor: stat.bgColor,
                             display: 'inline-flex',
                           }}
                         >
-                          <Icon size={24} color={stat.color} />
+                          <Icon size={20} color={stat.color} />
                         </Box>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: { xs: '0.65rem', sm: '0.75rem' }, textAlign: 'right', maxWidth: '50%' }} noWrap>
                           {stat.change}
                         </Typography>
                       </Stack>
                       <Stack spacing={0.5}>
-                        <Typography variant="h4" fontWeight={700}>
+                        <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                           {stat.value}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                           {stat.label}
                         </Typography>
                       </Stack>
@@ -347,6 +348,9 @@ const Dashboard = () => {
               </Card>
             </Box>
           </Stack>
+
+          {/* ── Requests Overview (Tickets & Services) ── */}
+          <RequestsOverviewPanel />
 
           {/* ── Recent Incidents Table — replaces stack-based layout ── */}
           <RecentIncidentsTable

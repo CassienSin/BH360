@@ -82,10 +82,15 @@ body {
   flex-direction: column;
 }
 
-// Scrollbar styling
+// Scrollbar styling — thinner on mobile
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
+
+  @media (min-width: 600px) {
+    width: 8px;
+    height: 8px;
+  }
 }
 
 ::-webkit-scrollbar-track {
@@ -98,6 +103,19 @@ body {
 
   &:hover {
     background: $grey-400;
+  }
+}
+
+// ── Mobile touch-target improvements ───────────────────────────────────────
+@media (max-width: 599px) {
+  // Prevent horizontal scroll on root
+  #root {
+    overflow-x: hidden;
+  }
+
+  // Ensure MUI DataGrid scrolls horizontally instead of breaking layout
+  .MuiDataGrid-root {
+    min-width: 0 !important;
   }
 }
 

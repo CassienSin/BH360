@@ -16,12 +16,12 @@ const AuthLayout = () => {
       }}
     >
       <Container maxWidth="sm">
-        <Stack spacing={4} alignItems="center">
+        <Stack spacing={3} alignItems="center">
           {/* Logo */}
           <Box
             sx={{
-              transform: 'scale(1.2)',
-              mb: 2,
+              transform: { xs: 'scale(1.0)', sm: 'scale(1.2)' },
+              mb: { xs: 0, sm: 2 },
             }}
           >
             <Logo size="large" showText={true} variant="default" />
@@ -32,7 +32,7 @@ const AuthLayout = () => {
             elevation={8}
             sx={{
               width: '100%',
-              p: 4,
+              p: { xs: 3, sm: 4 },
               borderRadius: 3,
             }}
           >

@@ -3,6 +3,15 @@
  * Firebase operations for helpdesk ticket management
  */
 
+import { USE_MOCK_DATA } from '../mocks/mockConfig';
+import { mockTickets, mockTicketStats } from '../mocks/mockData';
+
+// ─── mock write no-op ────────────────────────────────────────────────────────
+const mockWrite = (label) => {
+  console.info(`[MOCK] ${label} — write skipped (USE_MOCK_DATA=true)`);
+  return Promise.resolve('mock-id');
+};
+
 import { arrayUnion } from 'firebase/firestore';
 import {
   createDocument,
@@ -23,6 +32,7 @@ const TICKETS_COLLECTION = 'tickets';
  * @returns {Promise<string>} Document ID
  */
 export const createTicket = async (ticketData) => {
+  if (USE_MOCK_DATA) return mockWrite('createTicket');
   const ticket = {
     ...ticketData,
     status: ticketData.status || 'open',
@@ -41,6 +51,7 @@ export const createTicket = async (ticketData) => {
  * @returns {Promise<Object>} Ticket data
  */
 export const getTicket = async (ticketId) => {
+  if (USE_MOCK_DATA) return mockTickets.find((t) => t.id === ticketId) ?? null;
   return await getDocument(TICKETS_COLLECTION, ticketId);
 };
 
@@ -49,6 +60,8 @@ export const getTicket = async (ticketId) => {
  * @returns {Promise<Array>} Array of tickets
  */
 export const getAllTickets = async () => {
+  if (USE_MOCK_DATA)
+    return [...mockTickets].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return await queryDocuments(
     TICKETS_COLLECTION,
     [],
@@ -75,6 +88,10 @@ export const getTicketsByStatus = async (status) => {
  * @returns {Promise<Array>} Array of tickets
  */
 export const getUserTickets = async (userId) => {
+  if (USE_MOCK_DATA)
+    return [...mockTickets]
+      .filter((t) => t.userId === userId)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return await queryDocuments(
     TICKETS_COLLECTION,
     [{ field: 'userId', operator: '==', value: userId }],
@@ -101,6 +118,7 @@ export const getAssignedTickets = async (agentId) => {
  * @param {Object} updates - Fields to update
  */
 export const updateTicket = async (ticketId, updates) => {
+  if (USE_MOCK_DATA) return mockWrite('updateTicket');
   return await updateDocument(TICKETS_COLLECTION, ticketId, updates);
 };
 
@@ -110,6 +128,7 @@ export const updateTicket = async (ticketId, updates) => {
  * @param {string} agentId - Agent user ID
  */
 export const assignTicket = async (ticketId, agentId) => {
+  if (USE_MOCK_DATA) return mockWrite('assignTicket');
   return await updateDocument(TICKETS_COLLECTION, ticketId, {
     assignedTo: agentId,
     status: 'in-progress',
@@ -122,6 +141,7 @@ export const assignTicket = async (ticketId, agentId) => {
  * @param {Object} message - Message object
  */
 export const addTicketMessage = async (ticketId, message) => {
+  if (USE_MOCK_DATA) return mockWrite('addTicketMessage');
   return await updateDocument(TICKETS_COLLECTION, ticketId, {
     messages: arrayUnion({
       ...message,
@@ -137,6 +157,7 @@ export const addTicketMessage = async (ticketId, message) => {
  * @param {Object} feedback - Feedback object
  */
 export const addTicketFeedback = async (ticketId, feedback) => {
+  if (USE_MOCK_DATA) return mockWrite('addTicketFeedback');
   return await updateDocument(TICKETS_COLLECTION, ticketId, {
     feedback: arrayUnion({
       ...feedback,
@@ -152,6 +173,7 @@ export const addTicketFeedback = async (ticketId, feedback) => {
  * @param {Object} resolution - Resolution details
  */
 export const resolveTicket = async (ticketId, resolution = {}) => {
+  if (USE_MOCK_DATA) return mockWrite('resolveTicket');
   return await updateDocument(TICKETS_COLLECTION, ticketId, {
     status: 'resolved',
     resolvedAt: new Date(),
@@ -164,6 +186,7 @@ export const resolveTicket = async (ticketId, resolution = {}) => {
  * @param {string} ticketId - Ticket ID
  */
 export const closeTicket = async (ticketId) => {
+  if (USE_MOCK_DATA) return mockWrite('closeTicket');
   return await updateDocument(TICKETS_COLLECTION, ticketId, {
     status: 'closed',
     closedAt: new Date(),
@@ -175,6 +198,7 @@ export const closeTicket = async (ticketId) => {
  * @param {string} ticketId - Ticket ID
  */
 export const deleteTicket = async (ticketId) => {
+  if (USE_MOCK_DATA) return mockWrite('deleteTicket');
   return await deleteDocument(TICKETS_COLLECTION, ticketId);
 };
 
@@ -183,6 +207,7 @@ export const deleteTicket = async (ticketId) => {
  * @returns {Promise<Object>} Statistics object
  */
 export const getTicketStats = async () => {
+  if (USE_MOCK_DATA) return { ...mockTicketStats };
   const allTickets = await getAllTickets();
   
   return {

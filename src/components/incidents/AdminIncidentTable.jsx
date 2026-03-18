@@ -381,8 +381,8 @@ const AdminIncidentTable = () => {
   return (
     <Stack spacing={3}>
       {/* Header */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
-        <Stack spacing={1}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} gap={2}>
+        <Stack spacing={0.5}>
           {/* Issue #6, #13: h1 component + gradient text */}
           <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
             Incident Management
@@ -391,10 +391,11 @@ const AdminIncidentTable = () => {
             Monitor, manage and resolve all barangay incidents ({incidents.length} total)
           </Typography>
         </Stack>
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={1.5} flexShrink={0}>
           <Button
             variant="outlined"
-            startIcon={<Download size={20} />}
+            startIcon={<Download size={18} />}
+            size="small"
             sx={{
               borderColor: theme.palette.divider,
               color: theme.palette.text.primary,
@@ -404,107 +405,99 @@ const AdminIncidentTable = () => {
               },
             }}
           >
-            Export Data
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Export Data</Box>
+            <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>Export</Box>
           </Button>
           <Button
             variant="contained"
-            startIcon={<Plus size={20} />}
+            startIcon={<Plus size={18} />}
+            size="small"
             onClick={() => navigate('/incidents/create')}
           >
-            New Incident
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>New Incident</Box>
+            <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>New</Box>
           </Button>
         </Stack>
       </Stack>
 
       {/* Statistics Cards */}
-      <Stack direction="row" spacing={2} flexWrap="wrap">
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
         {[
           { label: 'Total Reports', value: incidents.length, color: theme.palette.primary.main },
-          {
-            label: 'Pending',
-            value: incidents.filter((i) => i.status === 'submitted').length,
-            color: theme.palette.info.main,
-          },
-          {
-            label: 'In Progress',
-            value: incidents.filter((i) => i.status === 'in-progress').length,
-            color: theme.palette.warning.main,
-          },
-          {
-            label: 'Resolved',
-            value: incidents.filter((i) => i.status === 'resolved').length,
-            color: theme.palette.success.main,
-          },
+          { label: 'Pending', value: incidents.filter((i) => i.status === 'submitted').length, color: theme.palette.info.main },
+          { label: 'In Progress', value: incidents.filter((i) => i.status === 'in-progress').length, color: theme.palette.warning.main },
+          { label: 'Resolved', value: incidents.filter((i) => i.status === 'resolved').length, color: theme.palette.success.main },
         ].map((stat, index) => (
           <Box
             key={index}
             sx={{
-              flex: 1,
-              minWidth: 180,
-              p: 2.5,
+              p: { xs: 2, sm: 2.5 },
               borderRadius: 3,
               background: alpha(stat.color, 0.08),
               border: `1px solid ${alpha(stat.color, 0.2)}`,
             }}
           >
-            <Typography variant="body2" color="text.secondary" fontWeight={500}>
+            <Typography variant="body2" color="text.secondary" fontWeight={500} noWrap>
               {stat.label}
             </Typography>
-            <Typography variant="h4" fontWeight={700} color={stat.color} mt={0.5}>
+            <Typography variant="h4" fontWeight={700} color={stat.color} mt={0.5} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
               {stat.value}
             </Typography>
           </Box>
         ))}
-      </Stack>
+      </Box>
 
       {/* Filters */}
-      <Stack direction="row" spacing={2} flexWrap="wrap">
+      <Stack spacing={1.5}>
         <TextField
           placeholder="Search incidents, reporters, locations..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          size="small"
+          fullWidth
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <Search size={20} />
+                <Search size={18} />
               </InputAdornment>
             ),
           }}
-          sx={{ flex: 1, minWidth: 250 }}
         />
-        <FormControl sx={{ minWidth: 140 }}>
-          <InputLabel>Status</InputLabel>
-          <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
-            <MenuItem value="all">All Status</MenuItem>
-            <MenuItem value="submitted">Submitted</MenuItem>
-            <MenuItem value="in-progress">In Progress</MenuItem>
-            <MenuItem value="resolved">Resolved</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl sx={{ minWidth: 140 }}>
-          <InputLabel>Category</InputLabel>
-          <Select value={categoryFilter} label="Category" onChange={(e) => setCategoryFilter(e.target.value)}>
-            <MenuItem value="all">All Categories</MenuItem>
-            <MenuItem value="crime">Crime</MenuItem>
-            <MenuItem value="noise">Noise</MenuItem>
-            <MenuItem value="fire">Fire</MenuItem>
-            <MenuItem value="hazard">Hazard</MenuItem>
-            <MenuItem value="dispute">Dispute</MenuItem>
-            <MenuItem value="health">Health</MenuItem>
-            <MenuItem value="utility">Utility</MenuItem>
-            <MenuItem value="other">Other</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl sx={{ minWidth: 140 }}>
-          <InputLabel>Priority</InputLabel>
-          <Select value={priorityFilter} label="Priority" onChange={(e) => setPriorityFilter(e.target.value)}>
-            <MenuItem value="all">All Priorities</MenuItem>
-            <MenuItem value="emergency">Emergency</MenuItem>
-            <MenuItem value="urgent">Urgent</MenuItem>
-            <MenuItem value="medium">Medium</MenuItem>
-            <MenuItem value="low">Low</MenuItem>
-          </Select>
-        </FormControl>
+        <Stack direction="row" spacing={1.5} flexWrap="wrap">
+          <FormControl size="small" sx={{ flex: 1, minWidth: 110 }}>
+            <InputLabel>Status</InputLabel>
+            <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
+              <MenuItem value="all">All Status</MenuItem>
+              <MenuItem value="submitted">Submitted</MenuItem>
+              <MenuItem value="in-progress">In Progress</MenuItem>
+              <MenuItem value="resolved">Resolved</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ flex: 1, minWidth: 110 }}>
+            <InputLabel>Category</InputLabel>
+            <Select value={categoryFilter} label="Category" onChange={(e) => setCategoryFilter(e.target.value)}>
+              <MenuItem value="all">All Categories</MenuItem>
+              <MenuItem value="crime">Crime</MenuItem>
+              <MenuItem value="noise">Noise</MenuItem>
+              <MenuItem value="fire">Fire</MenuItem>
+              <MenuItem value="hazard">Hazard</MenuItem>
+              <MenuItem value="dispute">Dispute</MenuItem>
+              <MenuItem value="health">Health</MenuItem>
+              <MenuItem value="utility">Utility</MenuItem>
+              <MenuItem value="other">Other</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ flex: 1, minWidth: 110 }}>
+            <InputLabel>Priority</InputLabel>
+            <Select value={priorityFilter} label="Priority" onChange={(e) => setPriorityFilter(e.target.value)}>
+              <MenuItem value="all">All Priorities</MenuItem>
+              <MenuItem value="emergency">Emergency</MenuItem>
+              <MenuItem value="urgent">Urgent</MenuItem>
+              <MenuItem value="medium">Medium</MenuItem>
+              <MenuItem value="low">Low</MenuItem>
+            </Select>
+          </FormControl>
+        </Stack>
       </Stack>
 
       {/* Data Grid */}

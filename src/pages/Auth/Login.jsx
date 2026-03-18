@@ -40,7 +40,7 @@ const Login = () => {
 
   // Issue #23: Update document title
   useEffect(() => {
-    document.title = 'Sign In – BH360';
+    document.title = 'Sign In';
   }, []);
 
   const handleSubmit = async (e) => {
@@ -170,10 +170,11 @@ const Login = () => {
                 />
               }
               label={
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" noWrap>
                   Remember me
                 </Typography>
               }
+              sx={{ flexShrink: 0 }}
             />
             {/* Issue #8: Link now opens the forgot-password dialog */}
             <Link
@@ -187,6 +188,8 @@ const Login = () => {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
                 '&:hover': { textDecoration: 'underline' },
               }}
             >

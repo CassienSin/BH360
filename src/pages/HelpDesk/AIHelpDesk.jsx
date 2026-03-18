@@ -347,7 +347,7 @@ const AIHelpDesk = () => {
   };
 
   return (
-    <Stack spacing={3} sx={{ height: 'calc(100vh - 200px)' }}>
+    <Stack spacing={3} sx={{ height: { xs: 'auto', sm: 'calc(100vh - 200px)' }, minHeight: { xs: 0, sm: 'auto' } }}>
       {/* Header */}
       <Stack direction="row" justifyContent="space-between" alignItems="start">
         <Stack spacing={1}>
@@ -377,17 +377,20 @@ const AIHelpDesk = () => {
       <Tabs
         value={currentTab}
         onChange={(_, newValue) => setCurrentTab(newValue)}
-        sx={{ '& .MuiTab-root': { fontWeight: 600 } }}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        sx={{ '& .MuiTab-root': { fontWeight: 600, minWidth: { xs: 'auto', sm: 160 }, px: { xs: 1.5, sm: 2 } } }}
       >
-        <Tab icon={<MessageCircle size={18} />} iconPosition="start" label="Chat with AI" />
+        <Tab icon={<MessageCircle size={18} />} iconPosition="start" label="Chat" />
         <Tab icon={<FileText size={18} />} iconPosition="start" label="Services" />
         <Tab icon={<HelpCircle size={18} />} iconPosition="start" label="FAQs" />
         <Tab
           icon={<Ticket size={18} />}
           iconPosition="start"
           label={
-            <Stack direction="row" spacing={1} alignItems="center">
-              <span>My Tickets</span>
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <span>Tickets</span>
               {myTickets.length > 0 && (
                 <Chip label={myTickets.length} size="small" color="primary" sx={{ height: 20 }} />
               )}
@@ -408,7 +411,7 @@ const AIHelpDesk = () => {
             border: `1px solid ${theme.palette.divider}`,
           }}
         >
-          <CardContent sx={{ flexGrow: 1, overflow: 'auto', maxHeight: 'calc(100vh - 400px)' }}>
+          <CardContent sx={{ flexGrow: 1, overflow: 'auto', maxHeight: { xs: '40vh', sm: 'calc(100vh - 400px)' } }}>
             <Stack spacing={2}>
               {messages.map((message) => (
                 <Box key={message.id}>
@@ -501,7 +504,7 @@ const AIHelpDesk = () => {
             </Stack>
           </CardContent>
 
-          <Box sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+          <Box sx={{ p: { xs: 1.5, sm: 2 }, borderTop: `1px solid ${theme.palette.divider}` }}>
             <Stack direction="row" spacing={1}>
               {/* Issue #25: whiteSpace: 'nowrap' prevents text wrapping in narrow container */}
               <Button
@@ -509,7 +512,7 @@ const AIHelpDesk = () => {
                 startIcon={<Ticket size={18} />}
                 onClick={() => setShowTicketDialog(true)}
                 size="small"
-                sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                sx={{ whiteSpace: 'nowrap', flexShrink: 0, display: { xs: 'none', sm: 'inline-flex' } }}
               >
                 Create Ticket
               </Button>

@@ -3,6 +3,15 @@
  * Firebase operations for user management
  */
 
+import { USE_MOCK_DATA } from '../mocks/mockConfig';
+import { mockUsers, mockUserStats } from '../mocks/mockData';
+
+// ─── mock write no-op ────────────────────────────────────────────────────────
+const mockWrite = (label) => {
+  console.info(`[MOCK] ${label} — write skipped (USE_MOCK_DATA=true)`);
+  return Promise.resolve('mock-id');
+};
+
 import {
   getDocument,
   getAllDocuments,
@@ -19,6 +28,7 @@ import {
  * @returns {Promise<Object>} User data
  */
 export const getUser = async (userId) => {
+  if (USE_MOCK_DATA) return mockUsers.find((u) => u.id === userId) ?? null;
   return await getDocument(COLLECTIONS.USERS, userId);
 };
 
@@ -27,6 +37,7 @@ export const getUser = async (userId) => {
  * @returns {Promise<Array>} Array of users
  */
 export const getAllUsers = async () => {
+  if (USE_MOCK_DATA) return [...mockUsers];
   return await getAllDocuments(COLLECTIONS.USERS);
 };
 
@@ -36,6 +47,7 @@ export const getAllUsers = async () => {
  * @returns {Promise<Array>} Array of users
  */
 export const getUsersByRole = async (role) => {
+  if (USE_MOCK_DATA) return mockUsers.filter((u) => u.role === role);
   return await queryDocuments(
     COLLECTIONS.USERS,
     [{ field: 'role', operator: '==', value: role }]
@@ -48,6 +60,7 @@ export const getUsersByRole = async (role) => {
  * @param {Object} updates - Fields to update
  */
 export const updateUserProfile = async (userId, updates) => {
+  if (USE_MOCK_DATA) return mockWrite('updateUserProfile');
   return await updateDocument(COLLECTIONS.USERS, userId, updates);
 };
 
@@ -57,6 +70,7 @@ export const updateUserProfile = async (userId, updates) => {
  * @param {string} role - New role
  */
 export const updateUserRole = async (userId, role) => {
+  if (USE_MOCK_DATA) return mockWrite('updateUserRole');
   return await updateDocument(COLLECTIONS.USERS, userId, { role });
 };
 
@@ -66,6 +80,7 @@ export const updateUserRole = async (userId, role) => {
  * @param {Object} userData - User data
  */
 export const saveUser = async (userId, userData) => {
+  if (USE_MOCK_DATA) return mockWrite('saveUser');
   return await setDocument(COLLECTIONS.USERS, userId, userData);
 };
 
@@ -74,6 +89,7 @@ export const saveUser = async (userId, userData) => {
  * @param {string} userId - User ID
  */
 export const deleteUser = async (userId) => {
+  if (USE_MOCK_DATA) return mockWrite('deleteUser');
   return await deleteDocument(COLLECTIONS.USERS, userId);
 };
 
@@ -83,6 +99,13 @@ export const deleteUser = async (userId) => {
  * @returns {Promise<Array>} Array of users
  */
 export const searchUsers = async (searchTerm) => {
+  if (USE_MOCK_DATA) {
+    const term = searchTerm.toLowerCase();
+    return mockUsers.filter((u) => {
+      const name = (u.displayName || `${u.firstName} ${u.lastName}` || '').toLowerCase();
+      return name.includes(term) || (u.email || '').toLowerCase().includes(term);
+    });
+  }
   const allUsers = await getAllUsers();
   const term = searchTerm.toLowerCase();
   
@@ -98,6 +121,7 @@ export const searchUsers = async (searchTerm) => {
  * @returns {Promise<Object>} Statistics object
  */
 export const getUserStats = async () => {
+  if (USE_MOCK_DATA) return { ...mockUserStats };
   const allUsers = await getAllUsers();
   
   return {
