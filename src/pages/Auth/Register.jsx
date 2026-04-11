@@ -8,12 +8,16 @@ import {
   Link,
   InputAdornment,
   IconButton,
-  Grid,
   Alert,
+  Box,
+  Chip,
+  LinearProgress,
 } from '@mui/material';
-import { Eye, EyeOff, Mail, Lock, User, Phone, MapPin } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { register } from '../../services/firebaseAuthService';
+import AddressSelector from '../../components/common/AddressSelector';
+import { validatePassword, getPasswordStrengthColor, getPasswordStrengthLabel } from '../../utils/passwordValidator';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -22,14 +26,27 @@ const Register = () => {
     lastName: '',
     email: '',
     phone: '',
-    address: '',
     password: '',
     confirmPassword: '',
   });
+  const [address, setAddress] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passwordValidation, setPasswordValidation] = useState({
+    isValid: false,
+    strength: 'weak',
+    errors: [],
+    requirements: {
+      minLength: false,
+      hasUpperCase: false,
+      hasLowerCase: false,
+      hasNumber: false,
+      hasSymbol: false,
+      notCommon: false,
+    },
+  });
 
   // Issue #23: Update document title
   useEffect(() => {
@@ -37,22 +54,36 @@ const Register = () => {
   }, []);
 
   const handleChange = (field) => (e) => {
-    setFormData({ ...formData, [field]: e.target.value });
+    const value = e.target.value;
+    setFormData({ ...formData, [field]: value });
+
+    // Validate password in real-time
+    if (field === 'password') {
+      const validation = validatePassword(value);
+      setPasswordValidation(validation);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      toast.error('Passwords do not match');
+    if (!address) {
+      setError('Please complete your address (Province, City, and Barangay)');
+      toast.error('Please complete your address');
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      toast.error('Password must be at least 6 characters long');
+    // Validate password strength
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.errors[0]);
+      toast.error('Please create a stronger password');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
 
@@ -64,18 +95,25 @@ const Register = () => {
         lastName: formData.lastName,
         fullName: `${formData.firstName} ${formData.lastName}`,
         phone: formData.phone,
-        address: formData.address,
-        role: 'resident', // Default role for new registrations
+        address: address.formatted,
+        province: address.province,
+        provinceCode: address.provinceCode,
+        city: address.city,
+        cityCode: address.cityCode,
+        barangay: address.barangay,
+        barangayCode: address.barangayCode,
+        zipCode: address.zipCode || '',
+        role: 'resident', // Default role for new registrations (barangay resident)
       });
 
-      toast.success('Account created successfully! Please check your email for verification.');
-      navigate('/login');
+      toast.success('Account created successfully! Please check your email for verification in your inbox.');
+      navigate('/dashboard');
     } catch (err) {
       console.error('Registration error:', err);
-      
+
       // Handle specific Firebase errors
       let errorMessage = 'Registration failed. Please try again.';
-      
+
       if (err.code === 'auth/email-already-in-use') {
         errorMessage = 'This email is already registered';
       } else if (err.code === 'auth/invalid-email') {
@@ -85,7 +123,7 @@ const Register = () => {
       } else if (err.code === 'auth/network-request-failed') {
         errorMessage = 'Network error. Please check your connection';
       }
-      
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -174,48 +212,96 @@ const Register = () => {
           }}
         />
 
-        <TextField
-          label="Address"
-          value={formData.address}
-          onChange={handleChange('address')}
-          required
-          fullWidth
-          multiline
-          rows={2}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start" sx={{ alignSelf: 'flex-start', pt: 1.5 }}>
-                <MapPin size={20} />
-              </InputAdornment>
-            ),
-          }}
-        />
+        <AddressSelector onChange={setAddress} />
 
-        <TextField
-          label="Password"
-          type={showPassword ? 'text' : 'password'}
-          value={formData.password}
-          onChange={handleChange('password')}
-          required
-          fullWidth
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Lock size={20} />
-              </InputAdornment>
-            ),
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  onClick={() => setShowPassword(!showPassword)}
-                  edge="end"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
+        <Stack spacing={1}>
+          <TextField
+            label="Password"
+            type={showPassword ? 'text' : 'password'}
+            value={formData.password}
+            onChange={handleChange('password')}
+            required
+            fullWidth
+            error={formData.password.length > 0 && !passwordValidation.isValid}
+            helperText={formData.password.length > 0 && passwordValidation.errors[0]}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Lock size={20} />
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {/* Password Strength Indicator */}
+          {formData.password.length > 0 && (
+            <Box>
+              <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                  Strength:
+                </Typography>
+                <Chip
+                  label={getPasswordStrengthLabel(passwordValidation.strength)}
+                  size="small"
+                  color={getPasswordStrengthColor(passwordValidation.strength)}
+                  variant="outlined"
+                />
+              </Stack>
+              <LinearProgress
+                variant="determinate"
+                value={
+                  passwordValidation.strength === 'strong'
+                    ? 100
+                    : passwordValidation.strength === 'good'
+                    ? 75
+                    : passwordValidation.strength === 'fair'
+                    ? 50
+                    : 25
+                }
+                color={getPasswordStrengthColor(passwordValidation.strength)}
+                sx={{ mb: 1.5, height: 6, borderRadius: 1 }}
+              />
+
+              {/* Requirements Checklist */}
+              <Stack spacing={0.5}>
+                <RequirementItem
+                  met={passwordValidation.requirements.minLength}
+                  text="At least 8 characters"
+                />
+                <RequirementItem
+                  met={passwordValidation.requirements.hasUpperCase}
+                  text="At least one uppercase letter (A-Z)"
+                />
+                <RequirementItem
+                  met={passwordValidation.requirements.hasLowerCase}
+                  text="At least one lowercase letter (a-z)"
+                />
+                <RequirementItem
+                  met={passwordValidation.requirements.hasNumber}
+                  text="At least one number (0-9)"
+                />
+                <RequirementItem
+                  met={passwordValidation.requirements.hasSymbol}
+                  text='At least one symbol (!@#$%^&*)'
+                />
+                <RequirementItem
+                  met={passwordValidation.requirements.notCommon}
+                  text="Not a common password"
+                />
+              </Stack>
+            </Box>
+          )}
+        </Stack>
 
         <TextField
           label="Confirm Password"
@@ -273,6 +359,26 @@ const Register = () => {
     </form>
   );
 };
+
+// Requirement checklist item
+const RequirementItem = ({ met, text }) => (
+  <Stack direction="row" spacing={1} alignItems="center">
+    {met ? (
+      <CheckCircle2 size={16} color="#4caf50" />
+    ) : (
+      <XCircle size={16} color="#f44336" />
+    )}
+    <Typography
+      variant="caption"
+      sx={{
+        color: met ? '#4caf50' : '#666',
+        textDecoration: met ? 'line-through' : 'none',
+      }}
+    >
+      {text}
+    </Typography>
+  </Stack>
+);
 
 export default Register;
 
