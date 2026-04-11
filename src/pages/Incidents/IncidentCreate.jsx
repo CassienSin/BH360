@@ -348,62 +348,185 @@ const IncidentCreate = () => {
       <form onSubmit={handleSubmit}>
         <Stack spacing={3}>
           {/* Quick Info - Category & Priority */}
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                select
-                label="Category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                required
-                fullWidth
-                helperText={
-                  formData.category
-                    ? CATEGORY_DESCRIPTIONS[formData.category]
-                    : aiClassification?.confidence >= 60
-                    ? `AI Suggestion: ${aiClassification.category} (${aiClassification.confidence}%)`
-                    : null
-                }
-              >
-                {Object.entries(CATEGORY_DESCRIPTIONS).map(([key, desc]) => (
-                  <MenuItem key={key} value={key}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Box
-                        sx={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: '50%',
-                          backgroundColor: theme.palette[CATEGORY_COLORS[key]]?.main || theme.palette.grey[500],
-                        }}
-                      />
-                      <span style={{ textTransform: 'capitalize' }}>{key}</span>
-                    </Stack>
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
+          <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+            <CardContent>
+              <Stack spacing={3}>
+                {/* Category Selection */}
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                    Category
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    <Grid container spacing={1}>
+                      {Object.entries(CATEGORY_DESCRIPTIONS).map(([key, desc]) => (
+                        <Grid item xs={12} sm={6} key={key}>
+                          <Box
+                            onClick={() => setFormData({ ...formData, category: key })}
+                            sx={{
+                              p: 2,
+                              borderRadius: 2,
+                              border: `2px solid ${
+                                formData.category === key
+                                  ? theme.palette[CATEGORY_COLORS[key]]?.main || theme.palette.grey[500]
+                                  : theme.palette.divider
+                              }`,
+                              backgroundColor:
+                                formData.category === key
+                                  ? alpha(theme.palette[CATEGORY_COLORS[key]]?.main || theme.palette.grey[500], 0.08)
+                                  : 'transparent',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              '&:hover': {
+                                borderColor: theme.palette[CATEGORY_COLORS[key]]?.main || theme.palette.grey[500],
+                                backgroundColor: alpha(
+                                  theme.palette[CATEGORY_COLORS[key]]?.main || theme.palette.grey[500],
+                                  0.05
+                                ),
+                              },
+                            }}
+                          >
+                            <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                              <Box
+                                sx={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: '50%',
+                                  backgroundColor: theme.palette[CATEGORY_COLORS[key]]?.main || theme.palette.grey[500],
+                                  flexShrink: 0,
+                                  mt: 0.5,
+                                }}
+                              />
+                              <Stack spacing={0.5} flex={1}>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={formData.category === key ? 700 : 600}
+                                  sx={{ textTransform: 'capitalize' }}
+                                >
+                                  {key}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {desc}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                    {aiClassification?.confidence >= 60 && !formData.category && (
+                      <Alert severity="info" sx={{ borderRadius: 2, mt: 1 }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Sparkles size={16} />
+                          <Typography variant="body2">
+                            AI suggests: <strong>{aiClassification.category}</strong> ({aiClassification.confidence}% confidence)
+                          </Typography>
+                        </Stack>
+                      </Alert>
+                    )}
+                  </Stack>
+                </Box>
 
-            <Grid item xs={12} md={6}>
-              <TextField
-                select
-                label="Priority"
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                required
-                fullWidth
-                helperText={
-                  aiPriority
-                    ? `AI Score: ${aiPriority.score}/100`
-                    : null
-                }
-              >
-                <MenuItem value="minor">Minor</MenuItem>
-                <MenuItem value="medium">Medium</MenuItem>
-                <MenuItem value="urgent">Urgent</MenuItem>
-                <MenuItem value="emergency">Emergency</MenuItem>
-              </TextField>
-            </Grid>
-          </Grid>
+                <Divider />
+
+                {/* Priority Selection */}
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                    Priority Level
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    <Grid container spacing={1}>
+                      {['minor', 'medium', 'urgent', 'emergency'].map((priority) => {
+                        const priorityConfig = {
+                          minor: { label: 'Minor', color: 'info', description: 'Low impact issue' },
+                          medium: { label: 'Medium', color: 'warning', description: 'Moderate impact' },
+                          urgent: { label: 'Urgent', color: 'error', description: 'Requires quick response' },
+                          emergency: {
+                            label: 'Emergency',
+                            color: 'error',
+                            description: 'Immediate action needed',
+                          },
+                        };
+                        const config = priorityConfig[priority];
+
+                        return (
+                          <Grid item xs={12} sm={6} key={priority}>
+                            <Box
+                              onClick={() => setFormData({ ...formData, priority })}
+                              sx={{
+                                p: 2,
+                                borderRadius: 2,
+                                border: `2px solid ${
+                                  formData.priority === priority
+                                    ? theme.palette[config.color]?.main
+                                    : theme.palette.divider
+                                }`,
+                                backgroundColor:
+                                  formData.priority === priority
+                                    ? alpha(theme.palette[config.color]?.main, 0.08)
+                                    : 'transparent',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                '&:hover': {
+                                  borderColor: theme.palette[config.color]?.main,
+                                  backgroundColor: alpha(theme.palette[config.color]?.main, 0.05),
+                                },
+                              }}
+                            >
+                              <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                                <Box
+                                  sx={{
+                                    width: 16,
+                                    height: 16,
+                                    borderRadius: '50%',
+                                    backgroundColor: theme.palette[config.color]?.main,
+                                    flexShrink: 0,
+                                    mt: 0.5,
+                                  }}
+                                />
+                                <Stack spacing={0.5} flex={1}>
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight={formData.priority === priority ? 700 : 600}
+                                  >
+                                    {config.label}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {config.description}
+                                  </Typography>
+                                </Stack>
+                              </Stack>
+                            </Box>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
+                    {aiPriority && (
+                      <Alert severity="info" sx={{ borderRadius: 2, mt: 1 }}>
+                        <Stack spacing={1}>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <TrendingUp size={16} />
+                            <Typography variant="body2">
+                              <strong>AI Priority Score: {aiPriority.score}/100</strong>
+                            </Typography>
+                          </Stack>
+                          <Box sx={{ height: 4, borderRadius: 1, bgcolor: theme.palette.action.hover, overflow: 'hidden' }}>
+                            <Box
+                              sx={{
+                                height: '100%',
+                                width: `${aiPriority.score}%`,
+                                bgcolor: aiPriority.score >= 70 ? theme.palette.error.main : theme.palette.warning.main,
+                                transition: 'width 0.3s',
+                              }}
+                            />
+                          </Box>
+                        </Stack>
+                      </Alert>
+                    )}
+                  </Stack>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
 
           {/* Incident Details Card */}
           <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
