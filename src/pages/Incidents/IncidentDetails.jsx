@@ -18,24 +18,15 @@ import {
 } from '@mui/material';
 import { ArrowLeft, MapPin, Calendar, User, Edit, Download, Share2, Clock, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import { useAppSelector } from '../../store/hooks';
-import { useIncident } from '../../hooks/useIncidents';
+import { isStaffRole, isTanodRole } from '../../config/roles';
+import { useIncident, useMarkIncidentFalseReport } from '../../hooks/useIncidents';
 import { useAllTanods } from '../../hooks/useTanod';
 import StatusUpdateDialog from '../../components/incidents/StatusUpdateDialog';
 import AssignTanodDialog from '../../components/incidents/AssignTanodDialog';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import AIAnalysisPanel from '../../components/incidents/AIAnalysisPanel';
 import ActivityTimeline from '../../components/incidents/ActivityTimeline';
-
-// Fix leaflet default icon issue
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
 
 const DEFAULT_COORDINATES = [14.5995, 120.9842];
 
@@ -46,8 +37,13 @@ const IncidentDetails = () => {
   const { user } = useAppSelector((state) => state.auth);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [falseReportDialogOpen, setFalseReportDialogOpen] = useState(false);
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'tanod';
+  const falseReportMutation = useMarkIncidentFalseReport();
+
+  // Staff roles (captain, kagawad, secretary) and tanod can manage incidents
+  const isAdmin = isStaffRole(user?.role) || isTanodRole(user?.role);
+  const isTanod = isTanodRole(user?.role);
 
   // Fetch incident data from Firebase
   const { data: incident, isLoading, error } = useIncident(id);
@@ -125,6 +121,11 @@ const IncidentDetails = () => {
         icon: <AlertCircle size={16} />,
         color: theme.palette.error.main,
       },
+      'false-report': {
+        label: 'False Report',
+        icon: <AlertCircle size={16} />,
+        color: theme.palette.warning.main,
+      },
     };
     return configs[status] || configs.submitted;
   };
@@ -188,6 +189,15 @@ const IncidentDetails = () => {
   const statusConfig = getStatusConfig(incident.status);
   const coordinates = getLocationCoordinates();
   const locationAddress = getLocationAddress();
+
+  const handleConfirmFalseReport = async () => {
+    await falseReportMutation.mutateAsync({
+      incidentId: incident.id,
+      reporterId: incident.userId,
+      note: 'Reported as prank/false report by tanod on scene.',
+    });
+    setFalseReportDialogOpen(false);
+  };
 
   return (
     <Stack spacing={3}>
@@ -358,27 +368,12 @@ const IncidentDetails = () => {
                     <Typography variant="subtitle1" fontWeight={600}>
                       Location
                     </Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <MapPin size={20} color={theme.palette.text.secondary} />
-                      <Typography variant="body2" color="text.secondary">
+                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                      <MapPin size={20} color={theme.palette.text.secondary} sx={{ mt: 0.5, flexShrink: 0 }} />
+                      <Typography variant="body2" sx={{ flex: 1 }}>
                         {locationAddress}
                       </Typography>
                     </Stack>
-                    <Box sx={{ height: 200, borderRadius: 2, overflow: 'hidden' }}>
-                      <MapContainer
-                        center={coordinates}
-                        zoom={15}
-                        style={{ height: '100%', width: '100%' }}
-                      >
-                        <TileLayer
-                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        />
-                        <Marker position={coordinates}>
-                          <Popup>{locationAddress}</Popup>
-                        </Marker>
-                      </MapContainer>
-                    </Box>
                   </Stack>
                 </Stack>
               </CardContent>
@@ -497,6 +492,17 @@ const IncidentDetails = () => {
                       >
                         {incident.assignedTo ? 'Reassign Tanod' : 'Assign Tanod'}
                       </Button>
+                      {isAdmin && incident.userId && incident.status !== 'false-report' && (
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          startIcon={<AlertCircle size={18} />}
+                          color="warning"
+                          onClick={() => setFalseReportDialogOpen(true)}
+                        >
+                          Mark False Report
+                        </Button>
+                      )}
                       <Button
                         variant="outlined"
                         fullWidth
@@ -534,6 +540,17 @@ const IncidentDetails = () => {
           incident={incident}
         />
       )}
+
+      <ConfirmDialog
+        open={falseReportDialogOpen}
+        onClose={() => setFalseReportDialogOpen(false)}
+        onConfirm={handleConfirmFalseReport}
+        title="Mark False Report"
+        message="This will mark the incident as a false report, issue a warning to the reporter, and automatically blacklist them after 3 false reports. Do you want to continue?"
+        confirmLabel="Yes, mark false report"
+        confirmColor="warning"
+        loading={falseReportMutation.isLoading}
+      />
     </Stack>
   );
 };

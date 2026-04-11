@@ -15,10 +15,12 @@ import {
   onAuthStateChanged,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  reload,
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { setDocument, getDocument, updateDocument } from './firebaseService';
 import { COLLECTIONS } from './firebaseService';
+import { setBarangayScope, clearBarangayScope } from './barangayScope';
 
 // ==================== AUTHENTICATION ====================
 
@@ -36,11 +38,18 @@ export const signIn = async (email, password) => {
     // Get additional user data from Firestore
     try {
       const userData = await getDocument(COLLECTIONS.USERS, user.uid);
+
+      // Activate barangay-level data isolation
+      if (userData.barangayCode) {
+        setBarangayScope(userData.barangayCode);
+      }
+
+      const { emailVerified: _skip, ...userDataWithoutVerification } = userData || {};
       return {
         uid: user.uid,
         email: user.email,
         emailVerified: user.emailVerified,
-        ...userData,
+        ...userDataWithoutVerification,
       };
     } catch (error) {
       // User document doesn't exist in Firestore, return basic auth data
@@ -74,7 +83,6 @@ export const register = async (email, password, additionalData = {}) => {
     // Create user document in Firestore
     const userData = {
       email: user.email,
-      emailVerified: user.emailVerified,
       role: additionalData.role || 'resident',
       ...additionalData,
     };
@@ -86,6 +94,7 @@ export const register = async (email, password, additionalData = {}) => {
     
     return {
       uid: user.uid,
+      emailVerified: user.emailVerified,
       ...userData,
     };
   } catch (error) {
@@ -99,6 +108,7 @@ export const register = async (email, password, additionalData = {}) => {
  */
 export const logout = async () => {
   try {
+    clearBarangayScope();
     await signOut(auth);
   } catch (error) {
     console.error('Error signing out:', error);
@@ -160,7 +170,10 @@ export const updateUserEmail = async (newEmail) => {
     if (!user) throw new Error('No user logged in');
     
     await updateEmail(user, newEmail);
-    await updateDocument(COLLECTIONS.USERS, user.uid, { email: newEmail });
+    await updateDocument(COLLECTIONS.USERS, user.uid, {
+      email: newEmail,
+      emailVerified: false,
+    });
     
     // Send verification email to new address
     await sendEmailVerification(user);
@@ -219,6 +232,26 @@ export const sendVerificationEmail = async () => {
 };
 
 /**
+ * Reload the current authenticated user and refresh verification status.
+ * @returns {Promise<{ emailVerified: boolean, email: string }>} Updated auth state
+ */
+export const reloadCurrentUser = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No user logged in');
+
+    await reload(user);
+    return {
+      email: user.email,
+      emailVerified: user.emailVerified,
+    };
+  } catch (error) {
+    console.error('Error reloading current user:', error);
+    throw error;
+  }
+};
+
+/**
  * Get current user
  * @returns {Object|null} Current user or null
  */
@@ -236,11 +269,12 @@ export const getCurrentUserData = async () => {
     if (!user) return null;
     
     const userData = await getDocument(COLLECTIONS.USERS, user.uid);
+    const { emailVerified: _skip, ...userDataWithoutVerification } = userData || {};
     return {
       uid: user.uid,
       email: user.email,
       emailVerified: user.emailVerified,
-      ...userData,
+      ...userDataWithoutVerification,
     };
   } catch (error) {
     console.error('Error getting current user data:', error);
@@ -252,7 +286,7 @@ export const getCurrentUserData = async () => {
  * Subscribe to authentication state changes.
  *
  * Auto-promotion: if VITE_ADMIN_EMAIL is set in .env and the signed-in user's
- * email matches, their Firestore document is updated to role:'admin' so the
+ * email matches, their Firestore document is updated to role:'captain' so the
  * correct role is persisted permanently (one-time self-healing write).
  *
  * @param {Function} callback - Callback function
@@ -262,32 +296,47 @@ export const subscribeToAuthState = (callback) => {
   return onAuthStateChanged(auth, async (user) => {
     if (user) {
       try {
+        await reload(user);
         const userData = await getDocument(COLLECTIONS.USERS, user.uid);
+
+        // Activate barangay-level data isolation on session restore
+        if (userData.barangayCode) {
+          setBarangayScope(userData.barangayCode);
+        }
 
         // ── Admin auto-promotion ─────────────────────────────────────────────
         // If VITE_ADMIN_EMAIL is defined in .env and matches the current user,
-        // ensure their Firestore document has role:'admin'.
+        // ensure their Firestore document has role:'captain'.
         const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
         if (
           adminEmail &&
           user.email === adminEmail &&
-          userData.role !== 'admin'
+          userData.role !== 'captain'
         ) {
           try {
-            await updateDocument(COLLECTIONS.USERS, user.uid, { role: 'admin' });
-            userData.role = 'admin';
-            console.log('✅ Admin role granted to', user.email);
+            await updateDocument(COLLECTIONS.USERS, user.uid, { role: 'captain' });
+            userData.role = 'captain';
+            console.log('✅ Barangay Captain role granted to', user.email);
           } catch (err) {
-            console.warn('Could not promote user to admin:', err);
+            console.warn('Could not promote user to captain:', err);
           }
         }
-        // ────────────────────────────────────────────────────────────────────
 
+        if (userData.emailVerified !== user.emailVerified) {
+          try {
+            await updateDocument(COLLECTIONS.USERS, user.uid, { emailVerified: user.emailVerified });
+            userData.emailVerified = user.emailVerified;
+          } catch (err) {
+            console.warn('Could not sync email verification status to Firestore:', err);
+          }
+        }
+
+        const { emailVerified: _skip, ...userDataWithoutVerification } = userData || {};
         callback({
           uid: user.uid,
           email: user.email,
           emailVerified: user.emailVerified,
-          ...userData,
+          ...userDataWithoutVerification,
         });
       } catch (error) {
         // Firestore document missing — return basic auth data (no role default)
@@ -300,6 +349,7 @@ export const subscribeToAuthState = (callback) => {
         });
       }
     } else {
+      clearBarangayScope();
       callback(null);
     }
   });
@@ -315,6 +365,7 @@ export default {
   updateUserPassword,
   reauthenticate,
   sendVerificationEmail,
+  reloadCurrentUser,
   getCurrentUser,
   getCurrentUserData,
   subscribeToAuthState,

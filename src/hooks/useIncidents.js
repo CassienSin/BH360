@@ -18,7 +18,14 @@ import {
   deleteIncident,
   subscribeToIncidents,
   getIncidentStats,
+  markIncidentAsFalseReport,
 } from '../services/incidentsService';
+import { useAppSelector } from '../store/hooks';
+import {
+  notifyNewIncident,
+  notifyTaskAssigned,
+  notifyIncidentResolved,
+} from '../services/notificationService';
 
 // Query keys
 const QUERY_KEYS = {
@@ -129,17 +136,58 @@ export const useIncidentsRealtime = (filters = []) => {
  */
 export const useCreateIncident = () => {
   const queryClient = useQueryClient();
+  const { user } = useAppSelector((state) => state.auth);
 
   return useMutation({
     mutationFn: createIncident,
-    onSuccess: () => {
+    onSuccess: async (incidentId, incidentData) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STATS });
       toast.success('Incident reported successfully');
+
+      notifyNewIncident({
+        incidentId,
+        incident: incidentData,
+        currentUserId: user?.id,
+        currentUserRole: user?.role,
+      }).catch((error) => {
+        console.warn('Incident notification failed:', error);
+      });
     },
     onError: (error) => {
       console.error('Error creating incident:', error);
-      toast.error('Failed to create incident');
+      const errorMessage = error?.message || 'Failed to create incident';
+      toast.error(errorMessage);
+    },
+  });
+};
+
+/**
+ * Hook to mark an incident as false report and warn the reporter
+ */
+export const useMarkIncidentFalseReport = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAppSelector((state) => state.auth);
+
+  return useMutation({
+    mutationFn: ({ incidentId, reporterId, note }) =>
+      markIncidentAsFalseReport({
+        incidentId,
+        reporterId,
+        updatedBy: user?.uid || user?.email || 'Tanod',
+        note,
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DETAIL(variables?.reporterId) });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DETAIL(variables?.incidentId) });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STATS });
+      toast.success('Reporter warned and incident marked as false report');
+    },
+    onError: (error) => {
+      console.error('Error marking false report:', error);
+      const errorMessage = error?.message || 'Failed to flag incident as false report';
+      toast.error(errorMessage);
     },
   });
 };
@@ -170,13 +218,23 @@ export const useUpdateIncident = () => {
  */
 export const useAssignIncident = () => {
   const queryClient = useQueryClient();
+  const { user } = useAppSelector((state) => state.auth);
 
   return useMutation({
     mutationFn: ({ incidentId, tanodId }) => assignIncident(incidentId, tanodId),
-    onSuccess: (_, { incidentId }) => {
+    onSuccess: async (_, { incidentId, tanodId }) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DETAIL(incidentId) });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL });
       toast.success('Incident assigned successfully');
+
+      notifyTaskAssigned({
+        incidentId,
+        assignedTo: tanodId,
+        currentUserId: user?.id,
+        currentUserRole: user?.role,
+      }).catch((error) => {
+        console.warn('Task assignment notification failed:', error);
+      });
     },
     onError: (error) => {
       console.error('Error assigning incident:', error);
@@ -190,14 +248,23 @@ export const useAssignIncident = () => {
  */
 export const useResolveIncident = () => {
   const queryClient = useQueryClient();
+  const { user } = useAppSelector((state) => state.auth);
 
   return useMutation({
     mutationFn: ({ incidentId, resolution }) => resolveIncident(incidentId, resolution),
-    onSuccess: (_, { incidentId }) => {
+    onSuccess: async (_, { incidentId }) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DETAIL(incidentId) });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STATS });
       toast.success('Incident resolved successfully');
+
+      notifyIncidentResolved({
+        incidentId,
+        currentUserId: user?.id,
+        currentUserRole: user?.role,
+      }).catch((error) => {
+        console.warn('Resolve notification failed:', error);
+      });
     },
     onError: (error) => {
       console.error('Error resolving incident:', error);

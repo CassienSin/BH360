@@ -13,15 +13,17 @@ const AuthLayout = () => {
         // Issue #15: Aligned with $primary-color (#6366F1) from SCSS / theme.palette.primary
         background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
         py: 4,
+        overflow: 'hidden',
       }}
     >
-      <Container maxWidth="sm">
-        <Stack spacing={3} alignItems="center">
+      <Container maxWidth="sm" sx={{ width: '100%' }}>
+        <Stack spacing={3} alignItems="center" sx={{ minHeight: 'auto' }}>
           {/* Logo */}
           <Box
             sx={{
               transform: { xs: 'scale(1.0)', sm: 'scale(1.2)' },
               mb: { xs: 0, sm: 2 },
+              flexShrink: 0,
             }}
           >
             <Logo size="large" showText={true} variant="default" />
@@ -34,6 +36,7 @@ const AuthLayout = () => {
               width: '100%',
               p: { xs: 3, sm: 4 },
               borderRadius: 3,
+              flexShrink: 0,
             }}
           >
             <Outlet />
@@ -47,6 +50,8 @@ const AuthLayout = () => {
               textAlign: 'center',
               fontSize: '0.875rem',
               m: 0,
+              flexShrink: 0,
+              mt: { xs: 1, sm: 2 },
             }}
           >
             © 2026 BH360. Empowering barangays with smart governance.

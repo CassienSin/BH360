@@ -18,28 +18,14 @@ const EVENTS = [
 ];
 
 const ROLES = [
-  { key: 'admin',    label: 'Admin'    },
-  { key: 'staff',    label: 'Staff'    },
-  { key: 'tanod',    label: 'Tanod'    },
-  { key: 'resident', label: 'Resident' },
+  { key: 'captain',   label: 'Brgy. Captain' },
+  { key: 'kagawad',   label: 'Kagawad'       },
+  { key: 'secretary', label: 'Secretary'     },
+  { key: 'tanod',     label: 'Tanod'         },
+  { key: 'resident',  label: 'Resident'      },
 ];
 
-// ── Preview (display-only) helper ────────────────────────────────────────────
-
-const channelText = (cell) => {
-  if (!cell) return '—';
-  const parts = [];
-  if (cell.email) parts.push('Email');
-  if (cell.push)  parts.push('Push');
-  return parts.length ? parts.join(' + ') : '—';
-};
-
-// ── Main component ────────────────────────────────────────────────────────────
-
-const NotificationSettings = forwardRef(function NotificationSettings(
-  { preview = false, onSwitchTab, onDirty },
-  ref,
-) {
+const NotificationSettings = forwardRef(function NotificationSettings({ onDirty }, ref) {
   const { user }         = useAppSelector((s) => s.auth);
   const { data, isLoading, isError } = useNotificationSettings();
   const saveMutation     = useSaveNotificationSettings();
@@ -71,47 +57,9 @@ const NotificationSettings = forwardRef(function NotificationSettings(
     onDirty?.();
   };
 
-  if (isLoading && !preview) return <LinearProgress sx={{ borderRadius: '12px' }} />;
-  if (isError   && !preview) return <Alert severity="error">Failed to load notification settings.</Alert>;
+  if (isLoading) return <LinearProgress sx={{ borderRadius: '12px' }} />;
+  if (isError)   return <Alert severity="error">Failed to load notification settings.</Alert>;
 
-  /* ── Preview (General tab): simple read-only matrix ── */
-  if (preview) {
-    return (
-      <SettingsSectionCard
-        title="🔔 Notification Preferences"
-        description="[Available in Notifications tab] — Per-role email & push notification matrix."
-        preview
-        onSwitchTab={onSwitchTab}
-      >
-        <TableContainer>
-          <Table size="small" sx={{ minWidth: 480 }}>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.50' }}>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', width: '35%' }}>Event</TableCell>
-                {ROLES.map((r) => (
-                  <TableCell key={r.key} align="center" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>{r.label}</TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {EVENTS.map((ev) => (
-                <TableRow key={ev.key} hover>
-                  <TableCell sx={{ fontSize: '0.8125rem' }}>{ev.label}</TableCell>
-                  {ROLES.map((r) => (
-                    <TableCell key={r.key} align="center" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-                      {channelText(events[ev.key]?.[r.key])}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </SettingsSectionCard>
-    );
-  }
-
-  /* ── Full editable matrix (Notifications tab) ── */
   return (
     <SettingsSectionCard
       title="🔔 Notification Preferences"

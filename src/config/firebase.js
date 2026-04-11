@@ -62,17 +62,29 @@ let messaging;
 
 try {
   app = initializeApp(firebaseConfig);
-  
+
   // Initialize Firebase services
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
-  
+
   // Initialize Messaging
   if (typeof window !== 'undefined') {
     messaging = getMessaging(app);
+
+    // Send config to service worker for background message handling
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        registration.active?.postMessage({
+          type: 'INIT_FIREBASE_CONFIG',
+          config: firebaseConfig,
+        });
+      }).catch((error) => {
+        console.warn('Service worker not available for Firebase config:', error);
+      });
+    }
   }
-  
+
   // Initialize Analytics (only in production and if supported)
   if (import.meta.env.PROD) {
     isSupported().then((supported) => {

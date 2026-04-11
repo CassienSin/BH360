@@ -22,7 +22,8 @@ import {
 } from 'recharts';
 import { useIncidentStats, useRecentIncidents, useAllIncidents } from '../../hooks/useIncidents';
 import { useActiveTanods } from '../../hooks/useTanod';
-import { useUserStats } from '../../hooks/useUsers';
+import { useAllUsers, useUserStats } from '../../hooks/useUsers';
+import { getBarangayScope } from '../../services/barangayScope';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import QuickActionsPanel from '../../components/dashboard/QuickActionsPanel';
 import RecentIncidentsTable from '../../components/dashboard/RecentIncidentsTable';
@@ -100,9 +101,16 @@ const Dashboard = () => {
   const { data: recentIncidents, isLoading: loadingRecent } = useRecentIncidents(5);
   const { data: activeTanods, isLoading: loadingTanods } = useActiveTanods();
   const { data: userStats, isLoading: loadingUsers } = useUserStats();
+  const { data: allUsers = [], isLoading: loadingAllUsers } = useAllUsers();
   const { data: allIncidents = [] } = useAllIncidents();
 
-  const isLoading = loadingIncidents || loadingTanods || loadingUsers;
+  const currentBarangayCode = getBarangayScope();
+  const scopedUsers = currentBarangayCode
+    ? allUsers.filter((user) => user.barangayCode === currentBarangayCode)
+    : allUsers;
+  const scopedResidents = scopedUsers.filter((user) => user.role === 'resident');
+
+  const isLoading = loadingIncidents || loadingTanods || loadingUsers || loadingAllUsers;
 
   const responseRate = incidentStats
     ? Math.round((incidentStats.resolved / incidentStats.total) * 100) || 0
@@ -128,8 +136,12 @@ const Dashboard = () => {
     {
       icon: Users,
       label: 'Registered Users',
-      value: userStats?.total?.toString() ?? '0',
-      change: `${userStats?.residents ?? 0} residents`,
+      value: currentBarangayCode
+        ? scopedUsers.length.toString()
+        : userStats?.total?.toString() ?? '0',
+      change: currentBarangayCode
+        ? `${scopedResidents.length} Residents`
+        : `${userStats?.residents ?? 0} residents`,
       color: theme.palette.info.main,
       bgColor: alpha(theme.palette.info.main, 0.1),
     },
@@ -137,7 +149,7 @@ const Dashboard = () => {
       icon: TrendingUp,
       label: 'Response Rate',
       value: `${responseRate}%`,
-      change: `${incidentStats?.resolved ?? 0} resolved`,
+      change: `${incidentStats?.resolved ?? 0} Resolved`,
       color: theme.palette.warning.main,
       bgColor: alpha(theme.palette.warning.main, 0.1),
     },
@@ -165,6 +177,17 @@ const Dashboard = () => {
     { label: 'Resolved', count: incidentStats?.resolved ?? 0, color: theme.palette.success.main },
     { label: 'Rejected', count: incidentStats?.rejected ?? 0, color: theme.palette.error.main },
   ];
+
+  const residentUsers = scopedUsers.filter((user) => user.role === 'resident');
+  const usersByBarangay = Object.entries(
+    residentUsers.reduce((acc, user) => {
+      const barangayName = user.barangay?.trim() || 'Unassigned';
+      const cityName = user.city?.trim();
+      const key = cityName ? `${barangayName} • ${cityName}` : barangayName;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {}),
+  ).sort((a, b) => b[1] - a[1]);
 
   const maxCount = Math.max(...categoryData.map((c) => c.count), 1);
 
@@ -348,6 +371,33 @@ const Dashboard = () => {
               </Card>
             </Box>
           </Stack>
+
+          {/* ── Registered Users by Barangay ── */}
+          <Card className="glass" sx={{ animation: 'fadeIn 0.8s ease-out' }}>
+            <CardContent>
+              <Typography variant="h5" fontWeight={600} mb={2}>
+                Registered Users by Barangay
+              </Typography>
+              {usersByBarangay.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No registered barangay residents found yet.
+                </Typography>
+              ) : (
+                <Stack spacing={1}>
+                  {usersByBarangay.map(([barangay, count]) => (
+                    <Stack key={barangay} direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                      <Typography variant="body2" noWrap>
+                        {barangay}
+                      </Typography>
+                      <Typography variant="body2" fontWeight={700}>
+                        {count}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </CardContent>
+          </Card>
 
           {/* ── Requests Overview (Tickets & Services) ── */}
           <RequestsOverviewPanel />

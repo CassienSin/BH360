@@ -56,7 +56,11 @@ const Login = () => {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
 
-      toast.success('Welcome back!');
+      if (userData.emailVerified) {
+        toast.success('Welcome back!');
+      } else {
+        toast.info('Welcome back! You can verify your email later from your Profile.');
+      }
       navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);

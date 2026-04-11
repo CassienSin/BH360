@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   Stack,
   Typography,
@@ -33,7 +34,8 @@ import { toast } from 'react-toastify';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-import { useIncidentsByTanod, useIncidentsByStatus, useUpdateIncident, useAssignIncident } from '../../hooks/useIncidents';
+import { useIncidentsByTanod, useIncidentsByStatus, useUpdateIncident, useAssignIncident, useMarkIncidentFalseReport } from '../../hooks/useIncidents';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 // Fix leaflet default icon issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -50,7 +52,9 @@ const TaskManagement = () => {
   const theme = useTheme();
   const [selectedTask, setSelectedTask] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
-  
+  const [falseReportDialogOpen, setFalseReportDialogOpen] = useState(false);
+  const navigate = useNavigate();
+
   // Get current user from Redux
   const currentUser = useSelector((state) => state.auth.user);
 
@@ -58,28 +62,34 @@ const TaskManagement = () => {
   useEffect(() => {
     document.title = 'My Tasks – BH360';
   }, []);
-  
+
   // Fetch incidents assigned to current tanod (use uid not id)
   const { data: assignedIncidents = [], isLoading: loadingAssigned, error: errorAssigned } = useIncidentsByTanod(currentUser?.uid);
-  
+
   // Fetch unassigned/submitted incidents that Tanod can accept
   const { data: availableIncidents = [], isLoading: loadingAvailable, error: errorAvailable } = useIncidentsByStatus('submitted');
-  
-  // Combine both datasets - filter out incidents already assigned to someone else
+
+  const falseReportCount = useMemo(
+    () => assignedIncidents.filter((incident) => incident.status === 'false-report').length,
+    [assignedIncidents]
+  );
+
+  // Combine both datasets - filter out incidents already assigned to someone else and false reports
   const allIncidents = useMemo(() => {
-    // Get unassigned incidents (no assignedTo or assignedTo is null)
-    const unassignedIncidents = availableIncidents.filter(inc => !inc.assignedTo);
-    
-    // Combine assigned incidents with unassigned ones
-    return [...assignedIncidents, ...unassignedIncidents];
+    const unassignedIncidents = availableIncidents.filter((inc) => !inc.assignedTo && inc.status === 'submitted');
+
+    const activeAssignedIncidents = assignedIncidents.filter((inc) => inc.status !== 'false-report');
+
+    return [...activeAssignedIncidents, ...unassignedIncidents];
   }, [assignedIncidents, availableIncidents]);
-  
+
   const isLoading = loadingAssigned || loadingAvailable;
   const error = errorAssigned || errorAvailable;
-  
+
   // Mutations
   const updateIncidentMutation = useUpdateIncident();
   const assignIncidentMutation = useAssignIncident();
+  const falseReportMutation = useMarkIncidentFalseReport();
 
   // Convert incidents to tasks format
   const tasks = useMemo(() => {
@@ -173,7 +183,7 @@ const TaskManagement = () => {
     try {
       await updateIncidentMutation.mutateAsync({
         incidentId: taskId,
-        updates: { 
+        updates: {
           status: 'resolved',
           resolvedAt: new Date(),
         },
@@ -181,6 +191,27 @@ const TaskManagement = () => {
       setOpenDialog(false);
     } catch (error) {
       console.error('Error completing task:', error);
+    }
+  };
+
+  const handleMarkFalseReport = async () => {
+    if (!selectedTask) return;
+
+    // Find the original incident to get userId
+    const incident = allIncidents.find((inc) => inc.id === selectedTask.id);
+
+    try {
+      await falseReportMutation.mutateAsync({
+        incidentId: selectedTask.id,
+        reporterId: incident?.userId,
+        note: 'Reported as prank/false report by tanod on scene.',
+      });
+      setFalseReportDialogOpen(false);
+      setOpenDialog(false);
+      toast.success('Incident marked as false report');
+      navigate('/tasks/false-reports');
+    } catch (error) {
+      console.error('Error marking false report:', error);
     }
   };
 
@@ -369,13 +400,25 @@ const TaskManagement = () => {
 
   return (
     <Stack spacing={3} className="animate-fade-in">
-      <Stack spacing={1}>
-        <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
-          Task Management
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          View and manage your assigned tasks ({tasks.length} active)
-        </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" spacing={2}>
+        <Stack spacing={1}>
+          <Typography variant="h4" component="h1" fontWeight={700} className="gradient-text">
+            Task Management
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            View and manage your assigned tasks ({tasks.length} active)
+          </Typography>
+        </Stack>
+        <Box>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AlertCircle size={16} />}
+            onClick={() => navigate('/tasks/false-reports')}
+          >
+            View False Reports
+          </Button>
+        </Box>
       </Stack>
 
       {/* Task Stats */}
@@ -411,7 +454,19 @@ const TaskManagement = () => {
                 Completed
               </Typography>
               <Typography variant="h5" fontWeight={700} color="success.main">
-                {tasks.filter(t => t.status === 'completed').length}
+                {tasks.filter((t) => t.status === 'completed').length}
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+        <Card className="glass" sx={{ flex: 1, minWidth: 140 }}>
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" color="text.secondary">
+                False Reports
+              </Typography>
+              <Typography variant="h5" fontWeight={700} color="warning.main">
+                {falseReportCount}
               </Typography>
             </Stack>
           </CardContent>
@@ -673,15 +728,25 @@ const TaskManagement = () => {
                 </>
               )}
               {selectedTask.status === 'accepted' && (
-                <Button
-                  onClick={() => handleCompleteTask(selectedTask.id)}
-                  variant="contained"
-                  startIcon={<CheckCircle size={18} />}
-                  color="success"
-                  disabled={updateIncidentMutation.isPending}
-                >
-                  {updateIncidentMutation.isPending ? 'Completing...' : 'Mark as Complete'}
-                </Button>
+                <>
+                  <Button
+                    onClick={() => setFalseReportDialogOpen(true)}
+                    startIcon={<AlertCircle size={18} />}
+                    color="warning"
+                    disabled={falseReportMutation.isPending}
+                  >
+                    Mark False Report
+                  </Button>
+                  <Button
+                    onClick={() => handleCompleteTask(selectedTask.id)}
+                    variant="contained"
+                    startIcon={<CheckCircle size={18} />}
+                    color="success"
+                    disabled={updateIncidentMutation.isPending}
+                  >
+                    {updateIncidentMutation.isPending ? 'Completing...' : 'Mark as Complete'}
+                  </Button>
+                </>
               )}
               {selectedTask.status === 'completed' && (
                 <Typography variant="body2" color="success.main" fontWeight={600}>
@@ -692,6 +757,17 @@ const TaskManagement = () => {
           </>
         )}
       </Dialog>
+
+      <ConfirmDialog
+        open={falseReportDialogOpen}
+        onClose={() => setFalseReportDialogOpen(false)}
+        onConfirm={handleMarkFalseReport}
+        title="Mark False Report"
+        message="This will mark the incident as a false report, issue a warning to the reporter, and automatically blacklist them after 3 false reports. Do you want to continue?"
+        confirmLabel="Yes, mark false report"
+        confirmColor="warning"
+        loading={falseReportMutation.isPending}
+      />
     </Stack>
   );
 };

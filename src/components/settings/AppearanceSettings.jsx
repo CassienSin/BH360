@@ -4,14 +4,8 @@ import { Check } from 'lucide-react';
 import { useAppSelector } from '../../store/hooks';
 import { useAppearanceSettings, useSaveAppearanceSettings } from '../../hooks/useSettings';
 import { addAuditLog, DEFAULTS } from '../../services/settingsService';
+import { COLOR_SCHEMES } from '../../theme/theme';
 import SettingsSectionCard from './SettingsSectionCard';
-
-const COLOR_SCHEMES = [
-  { name: 'Indigo (Default)', primary: '#6366F1', secondary: '#EC4899' },
-  { name: 'Ocean Blue',       primary: '#0EA5E9', secondary: '#06B6D4' },
-  { name: 'Forest Green',     primary: '#10B981', secondary: '#059669' },
-  { name: 'Sunset Orange',    primary: '#F59E0B', secondary: '#EF4444' },
-];
 
 const AppearanceSettings = forwardRef(function AppearanceSettings({ onDirty }, ref) {
   const { user } = useAppSelector((s) => s.auth);

@@ -24,6 +24,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { getBarangayScope } from './barangayScope';
 
 // ==================== COLLECTION REFERENCES ====================
 
@@ -43,6 +44,30 @@ export const COLLECTIONS = {
   SETTINGS: 'settings',
 };
 
+// ==================== BARANGAY SCOPING ====================
+
+/**
+ * Collections that remain at the Firestore root (shared across all barangays).
+ * Everything else is nested under  barangays/{code}/…
+ */
+const GLOBAL_COLLECTIONS = new Set([COLLECTIONS.USERS]);
+
+/**
+ * Return the effective Firestore collection path, automatically prefixed
+ * with  barangays/{barangayCode}/  when a scope is active and the
+ * collection is not in the global whitelist.
+ *
+ * @param {string} collectionName - Logical collection name
+ * @returns {string} Firestore path string
+ */
+export const getScopedPath = (collectionName) => {
+  const scope = getBarangayScope();
+  if (!scope || GLOBAL_COLLECTIONS.has(collectionName)) {
+    return collectionName;
+  }
+  return `barangays/${scope}/${collectionName}`;
+};
+
 // ==================== CRUD OPERATIONS ====================
 
 /**
@@ -59,7 +84,7 @@ export const createDocument = async (collectionName, data) => {
       updatedAt: serverTimestamp(),
     };
     
-    const docRef = await addDoc(collection(db, collectionName), dataWithTimestamp);
+    const docRef = await addDoc(collection(db, getScopedPath(collectionName)), dataWithTimestamp);
     return docRef.id;
   } catch (error) {
     console.error(`Error creating document in ${collectionName}:`, error);
@@ -81,7 +106,7 @@ export const setDocument = async (collectionName, docId, data) => {
       updatedAt: serverTimestamp(),
     };
     
-    await setDoc(doc(db, collectionName, docId), dataWithTimestamp);
+    await setDoc(doc(db, getScopedPath(collectionName), docId), dataWithTimestamp);
   } catch (error) {
     console.error(`Error setting document in ${collectionName}:`, error);
     throw error;
@@ -96,7 +121,7 @@ export const setDocument = async (collectionName, docId, data) => {
  */
 export const getDocument = async (collectionName, docId) => {
   try {
-    const docRef = doc(db, collectionName, docId);
+    const docRef = doc(db, getScopedPath(collectionName), docId);
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
@@ -117,7 +142,7 @@ export const getDocument = async (collectionName, docId) => {
  */
 export const getAllDocuments = async (collectionName) => {
   try {
-    const querySnapshot = await getDocs(collection(db, collectionName));
+    const querySnapshot = await getDocs(collection(db, getScopedPath(collectionName)));
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -136,7 +161,7 @@ export const getAllDocuments = async (collectionName) => {
  */
 export const updateDocument = async (collectionName, docId, data) => {
   try {
-    const docRef = doc(db, collectionName, docId);
+    const docRef = doc(db, getScopedPath(collectionName), docId);
     await updateDoc(docRef, {
       ...data,
       updatedAt: serverTimestamp(),
@@ -154,7 +179,7 @@ export const updateDocument = async (collectionName, docId, data) => {
  */
 export const deleteDocument = async (collectionName, docId) => {
   try {
-    await deleteDoc(doc(db, collectionName, docId));
+    await deleteDoc(doc(db, getScopedPath(collectionName), docId));
   } catch (error) {
     console.error(`Error deleting document from ${collectionName}:`, error);
     throw error;
@@ -172,7 +197,7 @@ export const deleteDocument = async (collectionName, docId) => {
  */
 export const queryDocuments = async (collectionName, filters = [], options = {}) => {
   try {
-    let q = collection(db, collectionName);
+    let q = collection(db, getScopedPath(collectionName));
     
     // Build query constraints
     const constraints = [];
@@ -233,7 +258,7 @@ export const getDocumentsByField = async (collectionName, field, value) => {
  * @returns {Function} Unsubscribe function
  */
 export const subscribeToDocument = (collectionName, docId, callback) => {
-  const docRef = doc(db, collectionName, docId);
+  const docRef = doc(db, getScopedPath(collectionName), docId);
   
   return onSnapshot(
     docRef,
@@ -259,7 +284,7 @@ export const subscribeToDocument = (collectionName, docId, callback) => {
  * @returns {Function} Unsubscribe function
  */
 export const subscribeToQuery = (collectionName, filters = [], options = {}, callback) => {
-  let q = collection(db, collectionName);
+  let q = collection(db, getScopedPath(collectionName));
   
   // Build query constraints
   const constraints = [];
@@ -305,9 +330,10 @@ export const batchWrite = async (operations) => {
     const batch = writeBatch(db);
     
     operations.forEach(({ type, collectionName, docId, data }) => {
+      const scopedPath = getScopedPath(collectionName);
       const docRef = docId 
-        ? doc(db, collectionName, docId)
-        : doc(collection(db, collectionName));
+        ? doc(db, scopedPath, docId)
+        : doc(collection(db, scopedPath));
       
       switch (type) {
         case 'set':
@@ -388,6 +414,7 @@ export const isFirebaseInitialized = () => {
 
 export default {
   COLLECTIONS,
+  getScopedPath,
   createDocument,
   setDocument,
   getDocument,

@@ -113,7 +113,7 @@ const TicketManagement = () => {
         ticketId: selectedTicketId,
         message: {
           text: replyMessage,
-          sender: 'admin',
+          sender: 'staff',
           senderName: `${user?.firstName} ${user?.lastName}`,
         },
       });
@@ -386,7 +386,7 @@ const TicketManagement = () => {
                 <Stack spacing={3}>
                   <Stack spacing={2}>
                     {(selectedTicket.messages || []).map((message, idx) => {
-                      const isOwn = message.sender === 'admin';
+                      const isOwn = message.sender === 'staff' || message.sender === 'admin';
                       return (
                         <Stack
                           key={message.id || idx}

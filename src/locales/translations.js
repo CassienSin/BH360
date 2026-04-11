@@ -94,7 +94,7 @@ export const translations = {
     header_welcome_back:  'Maayong pag-abot',
     header_profile:       'Profile',
     header_settings:      'Mga Setting',
-    header_logout:        'Paglabas',
+    header_logout:        'Paggawas',
 
     // ── Sidebar collapse ──
     sidebar_expand:   'Palapad ang sidebar',

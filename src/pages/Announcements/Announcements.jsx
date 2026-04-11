@@ -31,7 +31,7 @@ const Announcements = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [announcementToDelete, setAnnouncementToDelete] = useState(null);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'captain';
 
   const { data: announcements = [], isLoading, error, refetch } = useAllAnnouncements();
   const deleteAnnouncementMutation = useDeleteAnnouncement();

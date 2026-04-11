@@ -34,6 +34,10 @@ import {
 import { useAppSelector } from '../../store/hooks';
 import Logo from '../common/Logo';
 import { useT } from '../../context/LanguageContext';
+import {
+  ROLE_CAPTAIN, ROLE_KAGAWAD, ROLE_SECRETARY, ROLE_TANOD, ROLE_RESIDENT,
+  ALL_ROLES, ADMIN_STAFF_ROLES, ROLE_LABEL_MAP,
+} from '../../config/roles';
 
 // ─── Nav item definitions ─────────────────────────────────────────────────────
 
@@ -41,28 +45,28 @@ const MENU_SECTIONS = [
   {
     labelKey: 'nav_section_main',
     items: [
-      { icon: LayoutDashboard, labelKey: 'nav_dashboard',     path: '/dashboard', roles: ['admin', 'staff', 'tanod', 'resident'] },
-      { icon: AlertCircle,     labelKey: 'nav_incidents',     path: '/incidents', roles: ['admin', 'staff', 'resident'] },
-      { icon: ClipboardCheck,  labelKey: 'nav_my_tasks',      path: '/tasks',     roles: ['tanod'] },
-      { icon: Calendar,        labelKey: 'nav_my_schedule',   path: '/schedule',  roles: ['tanod'] },
-      { icon: MessageCircle,   labelKey: 'nav_ai_helpdesk',   path: '/helpdesk',  roles: ['resident', 'tanod'] },
-      { icon: Bell,            labelKey: 'nav_announcements', path: '/announcements', roles: ['admin', 'staff', 'tanod', 'resident'] },
+      { icon: LayoutDashboard, labelKey: 'nav_dashboard',     path: '/dashboard', roles: [ROLE_CAPTAIN, ROLE_KAGAWAD, ROLE_SECRETARY, ROLE_TANOD] },
+      { icon: AlertCircle,     labelKey: 'nav_incidents',     path: '/incidents', roles: [...ADMIN_STAFF_ROLES, ROLE_RESIDENT] },
+      { icon: ClipboardCheck,  labelKey: 'nav_my_tasks',      path: '/tasks',     roles: [ROLE_TANOD] },
+      { icon: Calendar,        labelKey: 'nav_my_schedule',   path: '/schedule',  roles: [ROLE_TANOD] },
+      { icon: MessageCircle,   labelKey: 'nav_ai_helpdesk',   path: '/helpdesk',  roles: [ROLE_RESIDENT, ROLE_TANOD] },
+      { icon: Bell,            labelKey: 'nav_announcements', path: '/announcements', roles: ALL_ROLES },
     ],
   },
   {
     labelKey: 'nav_section_administration',
     items: [
-      { icon: Shield,   labelKey: 'nav_tanod_management',  path: '/tanod',     roles: ['admin', 'staff'] },
-      { icon: Users,    labelKey: 'nav_user_management',   path: '/users',     roles: ['admin'] },
-      { icon: Ticket,   labelKey: 'nav_ticket_management', path: '/tickets',   roles: ['admin', 'staff'] },
-      { icon: BarChart3,labelKey: 'nav_analytics',         path: '/analytics', roles: ['admin', 'staff'] },
+      { icon: Shield,   labelKey: 'nav_tanod_management',  path: '/tanod',     roles: ADMIN_STAFF_ROLES },
+      { icon: Users,    labelKey: 'nav_user_management',   path: '/users',     roles: [ROLE_CAPTAIN] },
+      { icon: Ticket,   labelKey: 'nav_ticket_management', path: '/tickets',   roles: ADMIN_STAFF_ROLES },
+      { icon: BarChart3,labelKey: 'nav_analytics',         path: '/analytics', roles: ADMIN_STAFF_ROLES },
     ],
   },
   {
     labelKey: 'nav_section_account',
     items: [
-      { icon: User,     labelKey: 'nav_profile',  path: '/profile',  roles: ['admin', 'staff', 'tanod', 'resident'] },
-      { icon: Settings, labelKey: 'nav_settings', path: '/settings', roles: ['admin', 'staff', 'tanod', 'resident'] },
+      { icon: User,     labelKey: 'nav_profile',  path: '/profile',  roles: ALL_ROLES },
+      { icon: Settings, labelKey: 'nav_settings', path: '/settings', roles: ALL_ROLES },
     ],
   },
 ];
@@ -316,7 +320,7 @@ const Sidebar = memo(({ onClose, collapsed = false, onToggleCollapse }) => {
                       variant="caption"
                       sx={{ color: 'text.secondary', textTransform: 'capitalize' }}
                     >
-                      {user.role}
+                      {ROLE_LABEL_MAP[user.role] || user.role}
                     </Typography>
                   </Box>
                 </ListItemButton>

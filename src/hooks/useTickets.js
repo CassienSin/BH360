@@ -5,6 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { useAppSelector } from '../store/hooks';
 import { subscribeToQuery } from '../services/firebaseService';
 import {
   createTicket,
@@ -18,6 +19,7 @@ import {
   deleteTicket,
   getTicketStats,
 } from '../services/ticketsService';
+import { notifyFeedbackSubmitted } from '../services/notificationService';
 
 const TICKETS_COLLECTION = 'tickets';
 
@@ -185,12 +187,22 @@ export const useAddTicketMessage = () => {
  */
 export const useAddTicketFeedback = () => {
   const queryClient = useQueryClient();
+  const { user } = useAppSelector((state) => state.auth);
 
   return useMutation({
     mutationFn: ({ ticketId, feedback }) => addTicketFeedback(ticketId, feedback),
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL });
       toast.success('Thank you for your feedback!');
+
+      notifyFeedbackSubmitted({
+        ticketId: variables.ticketId,
+        title: variables.feedback?.subject || 'Ticket feedback submitted',
+        currentUserId: user?.id,
+        currentUserRole: user?.role,
+      }).catch((error) => {
+        console.warn('Feedback notification failed:', error);
+      });
     },
     onError: () => {
       toast.error('Failed to submit feedback.');

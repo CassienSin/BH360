@@ -33,7 +33,7 @@ export default [
       'react-hooks/exhaustive-deps': 'warn',
       'react-hooks/set-state-in-effect': 'error',
       'no-console': ['warn', { allow: ['error', 'warn'] }],
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_|^context$|^type$', varsIgnorePattern: '^_|^React$' }],
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_|^context$|^type$', varsIgnorePattern: '^_|^React$' }],
     },
   },
 

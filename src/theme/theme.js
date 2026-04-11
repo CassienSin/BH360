@@ -1,6 +1,13 @@
 import { createTheme } from '@mui/material/styles';
 
-const theme = createTheme({
+export const COLOR_SCHEMES = [
+  { name: 'Indigo (Default)', primary: '#6366F1', secondary: '#EC4899' },
+  { name: 'Ocean Blue',       primary: '#0EA5E9', secondary: '#06B6D4' },
+  { name: 'Forest Green',     primary: '#10B981', secondary: '#059669' },
+  { name: 'Sunset Orange',    primary: '#F59E0B', secondary: '#EF4444' },
+];
+
+const baseThemeConfig = {
   palette: {
     mode: 'light',
     primary: {
@@ -298,6 +305,49 @@ const theme = createTheme({
       },
     },
   },
-});
+};
+
+const theme = createTheme(baseThemeConfig);
+
+export const buildTheme = (appearance = {}) => {
+  const scheme = COLOR_SCHEMES[appearance.colorScheme ?? 0] ?? COLOR_SCHEMES[0];
+  const mode = appearance.darkMode ? 'dark' : 'light';
+  const compactMode = appearance.compactMode ?? false;
+
+  return createTheme({
+    ...baseThemeConfig,
+    palette: {
+      ...baseThemeConfig.palette,
+      mode,
+      primary: {
+        ...baseThemeConfig.palette.primary,
+        main: scheme.primary,
+        light: scheme.primary,
+        dark: scheme.primary,
+      },
+      secondary: {
+        ...baseThemeConfig.palette.secondary,
+        main: scheme.secondary,
+        light: scheme.secondary,
+        dark: scheme.secondary,
+      },
+      background: {
+        default: mode === 'dark' ? '#0B1120' : baseThemeConfig.palette.background.default,
+        paper: mode === 'dark' ? '#14213D' : baseThemeConfig.palette.background.paper,
+      },
+      text: {
+        ...baseThemeConfig.palette.text,
+        primary: mode === 'dark' ? '#F8FAFC' : baseThemeConfig.palette.text.primary,
+        secondary: mode === 'dark' ? '#CBD5E1' : baseThemeConfig.palette.text.secondary,
+      },
+      divider: mode === 'dark' ? '#334155' : baseThemeConfig.palette.divider,
+    },
+    spacing: compactMode ? 6 : 8,
+    shape: {
+      ...baseThemeConfig.shape,
+      borderRadius: compactMode ? 6 : baseThemeConfig.shape.borderRadius,
+    },
+  });
+};
 
 export default theme;

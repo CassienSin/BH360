@@ -3,22 +3,6 @@
  * Firebase operations for tanod/barangay official management
  */
 
-import { USE_MOCK_DATA } from '../mocks/mockConfig';
-import {
-  mockTanods,
-  mockActiveTanods,
-  mockAttendance,
-  mockSchedules,
-  mockPatrolAreas,
-  mockPerformance,
-} from '../mocks/mockData';
-
-// ─── mock write no-op ────────────────────────────────────────────────────────
-const mockWrite = (label) => {
-  console.info(`[MOCK] ${label} — write skipped (USE_MOCK_DATA=true)`);
-  return Promise.resolve('mock-id');
-};
-
 import {
   createDocument,
   getDocument,
@@ -37,7 +21,6 @@ import {
  * Create a new tanod profile in the users collection
  */
 export const createTanodProfile = async (profileData) => {
-  if (USE_MOCK_DATA) return mockWrite('createTanodProfile');
   return await createDocument(COLLECTIONS.USERS, { ...profileData, role: 'tanod' });
 };
 
@@ -45,14 +28,12 @@ export const createTanodProfile = async (profileData) => {
  * Update an existing tanod's profile in the users collection
  */
 export const updateTanodProfile = async (tanodId, updates) => {
-  if (USE_MOCK_DATA) return mockWrite('updateTanodProfile');
   return await updateDocument(COLLECTIONS.USERS, tanodId, updates);
 };
 
 // ─── Patrol areas ──────────────────────────────────────────────────────────────
 
 /** Default patrol areas seeded when the collection is empty */
-// Firestore does not support nested arrays — coordinates stored as array of {lat, lng} objects
 const DEFAULT_PATROL_AREAS = [
   {
     name: 'Zone A – Poblacion',
@@ -84,7 +65,6 @@ const DEFAULT_PATROL_AREAS = [
 ];
 
 export const getAllPatrolAreas = async () => {
-  if (USE_MOCK_DATA) return [...mockPatrolAreas];
   const areas = await getAllDocuments(COLLECTIONS.PATROL_AREAS);
   if (areas.length === 0) {
     // Seed defaults on first load
@@ -97,17 +77,14 @@ export const getAllPatrolAreas = async () => {
 };
 
 export const createPatrolArea = async (areaData) => {
-  if (USE_MOCK_DATA) return mockWrite('createPatrolArea');
   return await createDocument(COLLECTIONS.PATROL_AREAS, areaData);
 };
 
 export const updatePatrolAreaById = async (areaId, updates) => {
-  if (USE_MOCK_DATA) return mockWrite('updatePatrolAreaById');
   return await updateDocument(COLLECTIONS.PATROL_AREAS, areaId, updates);
 };
 
 export const deletePatrolArea = async (areaId) => {
-  if (USE_MOCK_DATA) return mockWrite('deletePatrolArea');
   return await deleteDocument(COLLECTIONS.PATROL_AREAS, areaId);
 };
 
@@ -116,7 +93,6 @@ export const deletePatrolArea = async (areaId) => {
  * @returns {Promise<Array>} Array of tanod users
  */
 export const getAllTanods = async () => {
-  if (USE_MOCK_DATA) return [...mockTanods];
   return await queryDocuments(
     COLLECTIONS.USERS,
     [{ field: 'role', operator: '==', value: 'tanod' }]
@@ -129,7 +105,6 @@ export const getAllTanods = async () => {
  * @returns {Promise<Object>} Tanod data
  */
 export const getTanod = async (tanodId) => {
-  if (USE_MOCK_DATA) return mockTanods.find((t) => t.id === tanodId) ?? null;
   return await getDocument(COLLECTIONS.TANOD, tanodId);
 };
 
@@ -138,7 +113,6 @@ export const getTanod = async (tanodId) => {
  * @returns {Promise<Array>} Array of active tanods
  */
 export const getActiveTanods = async () => {
-  if (USE_MOCK_DATA) return [...mockActiveTanods];
   return await queryDocuments(
     COLLECTIONS.TANOD,
     [{ field: 'status', operator: '==', value: 'active' }]
@@ -151,7 +125,6 @@ export const getActiveTanods = async () => {
  * @param {string} status - New status (active, inactive, on-leave)
  */
 export const updateTanodStatus = async (tanodId, status) => {
-  if (USE_MOCK_DATA) return mockWrite('updateTanodStatus');
   return await updateDocument(COLLECTIONS.TANOD, tanodId, { status });
 };
 
@@ -161,7 +134,6 @@ export const updateTanodStatus = async (tanodId, status) => {
  * @returns {Promise<string>} Document ID
  */
 export const recordAttendance = async (attendanceData) => {
-  if (USE_MOCK_DATA) return mockWrite('recordAttendance');
   const attendance = {
     ...attendanceData,
     checkInTime: attendanceData.checkInTime || getServerTimestamp(),
@@ -178,7 +150,6 @@ export const recordAttendance = async (attendanceData) => {
  * @param {Date} checkOutTime - Checkout time
  */
 export const checkoutAttendance = async (attendanceId, checkOutTime = new Date()) => {
-  if (USE_MOCK_DATA) return mockWrite('checkoutAttendance');
   const attendance = await getDocument(COLLECTIONS.ATTENDANCE, attendanceId);
   const checkInTime = attendance.checkInTime?.toDate() || new Date();
   const duration = Math.floor((checkOutTime - checkInTime) / (1000 * 60)); // Duration in minutes
@@ -196,10 +167,6 @@ export const checkoutAttendance = async (attendanceId, checkOutTime = new Date()
  * @returns {Promise<Array>} Array of attendance records
  */
 export const getTanodAttendance = async (tanodId, options = {}) => {
-  if (USE_MOCK_DATA)
-    return [...mockAttendance]
-      .filter((a) => a.tanodId === tanodId)
-      .sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime));
   // No server-side orderBy to avoid requiring a Firestore composite index.
   // Sort client-side instead.
   const results = await queryDocuments(
@@ -220,10 +187,6 @@ export const getTanodAttendance = async (tanodId, options = {}) => {
  * @returns {Promise<Array>} Array of attendance records
  */
 export const getAllAttendance = async (options = {}) => {
-  if (USE_MOCK_DATA)
-    return [...mockAttendance].sort(
-      (a, b) => new Date(b.checkInTime) - new Date(a.checkInTime)
-    );
   const results = await queryDocuments(COLLECTIONS.ATTENDANCE, [], options);
   return results.sort((a, b) => {
     const aTime = a.checkInTime?.toDate ? a.checkInTime.toDate() : new Date(a.checkInTime || 0);
@@ -238,7 +201,6 @@ export const getAllAttendance = async (options = {}) => {
  * @returns {Promise<string>} Document ID
  */
 export const createSchedule = async (scheduleData) => {
-  if (USE_MOCK_DATA) return mockWrite('createSchedule');
   return await createDocument(COLLECTIONS.SCHEDULES, scheduleData);
 };
 
@@ -248,10 +210,6 @@ export const createSchedule = async (scheduleData) => {
  * @returns {Promise<Array>} Array of schedules
  */
 export const getTanodSchedules = async (tanodId) => {
-  if (USE_MOCK_DATA)
-    return [...mockSchedules]
-      .filter((s) => s.tanodId === tanodId)
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
   // No server-side orderBy to avoid requiring a Firestore composite index.
   // Sort client-side instead.
   const results = await queryDocuments(
@@ -270,8 +228,6 @@ export const getTanodSchedules = async (tanodId) => {
  * @returns {Promise<Array>} Array of schedules
  */
 export const getAllSchedules = async () => {
-  if (USE_MOCK_DATA)
-    return [...mockSchedules].sort((a, b) => new Date(a.date) - new Date(b.date));
   const results = await queryDocuments(COLLECTIONS.SCHEDULES, []);
   return results.sort((a, b) => {
     const aDate = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
@@ -286,7 +242,6 @@ export const getAllSchedules = async () => {
  * @param {Object} updates - Fields to update
  */
 export const updateSchedule = async (scheduleId, updates) => {
-  if (USE_MOCK_DATA) return mockWrite('updateSchedule');
   return await updateDocument(COLLECTIONS.SCHEDULES, scheduleId, updates);
 };
 
@@ -295,7 +250,6 @@ export const updateSchedule = async (scheduleId, updates) => {
  * @param {string} scheduleId - Schedule ID
  */
 export const deleteSchedule = async (scheduleId) => {
-  if (USE_MOCK_DATA) return mockWrite('deleteSchedule');
   return await deleteDocument(COLLECTIONS.SCHEDULES, scheduleId);
 };
 
@@ -305,15 +259,6 @@ export const deleteSchedule = async (scheduleId) => {
  * @returns {Promise<Object>} Performance metrics
  */
 export const getTanodPerformance = async (tanodId) => {
-  if (USE_MOCK_DATA)
-    return mockPerformance[tanodId] ?? {
-      totalIncidents: 0,
-      resolvedIncidents: 0,
-      resolutionRate: 0,
-      totalAttendance: 0,
-      totalHours: '0.0',
-      averageResponseTime: 0,
-    };
   // Get all incidents assigned to this tanod
   const incidents = await queryDocuments(
     COLLECTIONS.INCIDENTS,

@@ -10,3 +10,8 @@ createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </StrictMode>
 );
+
+// Hide the initial loader once React has mounted
+if (window.hideInitialLoader) {
+  window.hideInitialLoader();
+}

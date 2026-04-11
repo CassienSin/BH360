@@ -3,18 +3,6 @@
  * Firebase operations for incident management
  */
 
-import { USE_MOCK_DATA } from '../mocks/mockConfig';
-import {
-  mockIncidents,
-  mockIncidentStats,
-} from '../mocks/mockData';
-
-// ─── mock write no-op ────────────────────────────────────────────────────────
-const mockWrite = (label) => {
-  console.info(`[MOCK] ${label} — write skipped (USE_MOCK_DATA=true)`);
-  return Promise.resolve('mock-id');
-};
-
 import {
   createDocument,
   getDocument,
@@ -25,6 +13,45 @@ import {
   subscribeToQuery,
   COLLECTIONS,
 } from './firebaseService';
+import { getUser, updateUserProfile } from './usersService';
+import { Timestamp } from 'firebase/firestore';
+
+const INCIDENT_SPAM_RULES = {
+  minIntervalMinutes: 10,
+  maxPerHour: 3,
+  maxPerDay: 10,
+};
+
+const createSpamError = (message) => {
+  const error = new Error(message);
+  error.code = 'incident/spam-limit';
+  return error;
+};
+
+const getUserIncidentsWithin = async (userId, sinceTimestamp) => {
+  try {
+    return await queryDocuments(
+      COLLECTIONS.INCIDENTS,
+      [
+        { field: 'userId', operator: '==', value: userId },
+        { field: 'createdAt', operator: '>=', value: sinceTimestamp },
+      ],
+      { orderBy: { field: 'createdAt', direction: 'desc' } }
+    );
+  } catch (error) {
+    if (error.message?.includes('index') || error.code === 'failed-precondition') {
+      const allIncidents = await getAllDocuments(COLLECTIONS.INCIDENTS);
+      return allIncidents.filter(
+        (incident) =>
+          incident.userId === userId &&
+          incident.createdAt &&
+          incident.createdAt.toDate &&
+          incident.createdAt.toDate() >= sinceTimestamp.toDate()
+      );
+    }
+    throw error;
+  }
+};
 
 /**
  * Create a new incident
@@ -32,7 +59,44 @@ import {
  * @returns {Promise<string>} Document ID
  */
 export const createIncident = async (incidentData) => {
-  if (USE_MOCK_DATA) return mockWrite('createIncident');
+  const reporterId = incidentData.userId;
+  if (reporterId) {
+    const now = new Date();
+    const minInterval = Timestamp.fromDate(new Date(now.getTime() - INCIDENT_SPAM_RULES.minIntervalMinutes * 60000));
+    const hourAgo = Timestamp.fromDate(new Date(now.getTime() - 60 * 60000));
+    const dayAgo = Timestamp.fromDate(new Date(now.getTime() - 24 * 60 * 60000));
+
+    const recentDayIncidents = await getUserIncidentsWithin(reporterId, dayAgo);
+    const reportsLast10Minutes = recentDayIncidents.filter((incident) => {
+      const createdAt = incident.createdAt?.toDate ? incident.createdAt.toDate() : new Date(incident.createdAt);
+      return createdAt >= minInterval.toDate();
+    }).length;
+    const reportsLastHour = recentDayIncidents.filter((incident) => {
+      const createdAt = incident.createdAt?.toDate ? incident.createdAt.toDate() : new Date(incident.createdAt);
+      return createdAt >= hourAgo.toDate();
+    }).length;
+    const reportsLastDay = recentDayIncidents.length;
+
+    if (reportsLast10Minutes >= 1) {
+      throw createSpamError(`Please wait ${INCIDENT_SPAM_RULES.minIntervalMinutes} minutes before submitting another incident report.`);
+    }
+    if (reportsLastHour >= INCIDENT_SPAM_RULES.maxPerHour) {
+      throw createSpamError(`You have submitted too many incident reports in the last hour. Please wait and try again later.`);
+    }
+    if (reportsLastDay >= INCIDENT_SPAM_RULES.maxPerDay) {
+      throw createSpamError(`You have reached the report limit for today. Please try again tomorrow.`);
+    }
+
+    const reporter = await getUser(reporterId);
+    if (reporter?.blacklisted) {
+      const error = new Error(
+        'Your account is blocked from submitting incident reports due to repeated false reports.'
+      );
+      error.code = 'incident/blacklisted';
+      throw error;
+    }
+  }
+
   const incident = {
     ...incidentData,
     status: incidentData.status || 'submitted',
@@ -45,12 +109,42 @@ export const createIncident = async (incidentData) => {
 };
 
 /**
+ * Mark an incident as a false report and warn the reporter.
+ * @param {Object} params
+ * @param {string} params.incidentId - Incident ID
+ * @param {string} params.reporterId - User ID of reporter
+ * @param {string} params.updatedBy - User ID or email of current tanod
+ * @param {string} params.note - Optional reason/note
+ */
+export const markIncidentAsFalseReport = async ({ incidentId, reporterId, updatedBy, note }) => {
+  await updateDocument(COLLECTIONS.INCIDENTS, incidentId, {
+    status: 'false-report',
+    falseReport: true,
+    falseReportNote: note || 'Marked as false report by tanod.',
+    rejectedAt: new Date(),
+    updatedBy,
+    notes: note || 'Marked as false report by tanod.',
+  });
+
+  if (!reporterId) return;
+
+  const reporter = await getUser(reporterId);
+  if (!reporter) return;
+
+  const warnings = (reporter.falseReportWarnings || 0) + 1;
+  await updateUserProfile(reporterId, {
+    falseReportWarnings: warnings,
+    blacklisted: warnings >= 3,
+    blacklistedAt: warnings >= 3 ? new Date() : reporter.blacklistedAt || null,
+  });
+};
+
+/**
  * Get incident by ID
  * @param {string} incidentId - Incident ID
  * @returns {Promise<Object>} Incident data
  */
 export const getIncident = async (incidentId) => {
-  if (USE_MOCK_DATA) return mockIncidents.find((i) => i.id === incidentId) ?? null;
   return await getDocument(COLLECTIONS.INCIDENTS, incidentId);
 };
 
@@ -59,7 +153,6 @@ export const getIncident = async (incidentId) => {
  * @returns {Promise<Array>} Array of incidents
  */
 export const getAllIncidents = async () => {
-  if (USE_MOCK_DATA) return [...mockIncidents];
   return await getAllDocuments(COLLECTIONS.INCIDENTS);
 };
 
@@ -133,10 +226,6 @@ export const getIncidentsByTanod = async (tanodId) => {
  * @returns {Promise<Array>} Array of incidents
  */
 export const getRecentIncidents = async (limit = 10) => {
-  if (USE_MOCK_DATA)
-    return [...mockIncidents]
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, limit);
   return await queryDocuments(
     COLLECTIONS.INCIDENTS,
     [],
@@ -153,7 +242,6 @@ export const getRecentIncidents = async (limit = 10) => {
  * @param {Object} updates - Fields to update
  */
 export const updateIncident = async (incidentId, updates) => {
-  if (USE_MOCK_DATA) return mockWrite('updateIncident');
   return await updateDocument(COLLECTIONS.INCIDENTS, incidentId, updates);
 };
 
@@ -163,7 +251,6 @@ export const updateIncident = async (incidentId, updates) => {
  * @param {string} tanodId - Tanod user ID
  */
 export const assignIncident = async (incidentId, tanodId) => {
-  if (USE_MOCK_DATA) return mockWrite('assignIncident');
   return await updateDocument(COLLECTIONS.INCIDENTS, incidentId, {
     assignedTo: tanodId,
     status: 'in-progress',
@@ -176,7 +263,6 @@ export const assignIncident = async (incidentId, tanodId) => {
  * @param {Object} resolution - Resolution details
  */
 export const resolveIncident = async (incidentId, resolution = {}) => {
-  if (USE_MOCK_DATA) return mockWrite('resolveIncident');
   return await updateDocument(COLLECTIONS.INCIDENTS, incidentId, {
     status: 'resolved',
     resolvedAt: new Date(),
@@ -189,7 +275,6 @@ export const resolveIncident = async (incidentId, resolution = {}) => {
  * @param {string} incidentId - Incident ID
  */
 export const deleteIncident = async (incidentId) => {
-  if (USE_MOCK_DATA) return mockWrite('deleteIncident');
   return await deleteDocument(COLLECTIONS.INCIDENTS, incidentId);
 };
 
@@ -213,7 +298,6 @@ export const subscribeToIncidents = (filters = [], callback) => {
  * @returns {Promise<Object>} Statistics object
  */
 export const getIncidentStats = async () => {
-  if (USE_MOCK_DATA) return { ...mockIncidentStats };
   const allIncidents = await getAllIncidents();
   
   return {

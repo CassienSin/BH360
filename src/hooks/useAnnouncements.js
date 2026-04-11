@@ -4,6 +4,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
+import { useAppSelector } from '../store/hooks';
 import {
   getAllAnnouncements,
   getPublishedAnnouncements,
@@ -11,6 +12,7 @@ import {
   updateAnnouncement,
   deleteAnnouncement,
 } from '../services/announcementsService';
+import { notifyAnnouncementPublished } from '../services/notificationService';
 
 // Query keys
 const QUERY_KEYS = {
@@ -48,13 +50,21 @@ export const usePublishedAnnouncements = (options = {}) => {
  */
 export const useCreateAnnouncement = () => {
   const queryClient = useQueryClient();
+  const { user } = useAppSelector((state) => state.auth);
 
   return useMutation({
     mutationFn: createAnnouncement,
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ALL });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PUBLISHED });
       toast.success('Announcement created successfully!');
+      notifyAnnouncementPublished({
+        title: variables?.title,
+        currentUserId: user?.id,
+        currentUserRole: user?.role,
+      }).catch((error) => {
+        console.warn('Announcement notification failed:', error);
+      });
     },
     onError: (error) => {
       console.error('Error creating announcement:', error);

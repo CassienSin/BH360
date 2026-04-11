@@ -908,7 +908,7 @@ const AIHelpDesk = () => {
                               p: 1.5,
                               backgroundColor: isOwn
                                 ? alpha(theme.palette.primary.main, 0.15)
-                                : message.sender === 'admin'
+                                : (message.sender === 'staff' || message.sender === 'admin')
                                 ? alpha(theme.palette.secondary.main, 0.1)
                                 : alpha(theme.palette.grey[500], 0.1),
                               borderRadius: 2,
