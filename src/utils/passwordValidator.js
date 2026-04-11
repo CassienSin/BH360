@@ -10,6 +10,40 @@ const COMMON_PASSWORDS = [
 ];
 
 /**
+ * Keyboard patterns to reject (common sequential patterns)
+ */
+const KEYBOARD_PATTERNS = [
+  'qwerty', 'asdfgh', 'zxcvbnm', 'qwertyuiop',
+  '123456', '654321', '1234567', '12345678', '123456789', '1234567890',
+  '987654', '9876543', '98765432', '987654321',
+];
+
+/**
+ * Check if password is sequential numbers or repeated characters
+ */
+const isSequentialOrRepeated = (password) => {
+  // Check for repeated characters (111111, aaaaaa, etc.)
+  if (/(.)\1{4,}/.test(password)) {
+    return true;
+  }
+
+  // Check for sequential numbers
+  for (let i = 0; i < password.length - 2; i++) {
+    const char = password.charCodeAt(i);
+    const next = password.charCodeAt(i + 1);
+    const nextNext = password.charCodeAt(i + 2);
+
+    // Check if sequential (ascending or descending)
+    if ((next === char + 1 && nextNext === char + 2) ||
+        (next === char - 1 && nextNext === char - 2)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/**
  * Validate password strength
  * @param {string} password - Password to validate
  * @returns {object} - Validation result with details
@@ -25,7 +59,9 @@ export const validatePassword = (password) => {
       hasLowerCase: /[a-z]/.test(password),
       hasNumber: /\d/.test(password),
       hasSymbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
-      notCommon: !COMMON_PASSWORDS.includes(password.toLowerCase()),
+      notCommon: !COMMON_PASSWORDS.includes(password.toLowerCase()) &&
+                 !KEYBOARD_PATTERNS.some(pattern => password.toLowerCase().includes(pattern)) &&
+                 !isSequentialOrRepeated(password),
     },
   };
 
@@ -56,7 +92,7 @@ export const validatePassword = (password) => {
 
   // Check common passwords
   if (!result.requirements.notCommon) {
-    result.errors.push('This password is too common. Please choose a stronger password');
+    result.errors.push('This password is too weak or common. Please choose a stronger password');
   }
 
   // Determine if valid
@@ -65,9 +101,9 @@ export const validatePassword = (password) => {
   // Determine strength
   if (result.isValid) {
     const metRequirements = Object.values(result.requirements).filter(Boolean).length;
-    if (metRequirements === 5) {
+    if (metRequirements === 6) {
       result.strength = 'strong';
-    } else if (metRequirements >= 4) {
+    } else if (metRequirements >= 5) {
       result.strength = 'good';
     } else {
       result.strength = 'fair';
