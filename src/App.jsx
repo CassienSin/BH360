@@ -51,6 +51,7 @@ const Announcements = lazy(() => import('./pages/Announcements/Announcements'));
 const Analytics = lazy(() => import('./pages/Analytics/Analytics'));
 const Profile  = lazy(() => import('./pages/Profile/Profile'));
 const Settings = lazy(() => import('./pages/Settings/Settings'));
+const NotificationsPage = lazy(() => import('./pages/Notifications/NotificationsPage'));
 
 // Create emotion cache with prepend for MUI styles
 const createEmotionCache = () => {
@@ -137,6 +138,7 @@ const AppContent = () => {
                 <Route path="/tickets" element={<TicketManagement />} />
                 <Route path="/announcements" element={<Announcements />} />
                 <Route path="/analytics" element={<Analytics />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/profile"   element={<Profile />} />
                 <Route path="/settings"  element={<Settings />} />
               </Route>
