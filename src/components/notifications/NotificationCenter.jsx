@@ -13,7 +13,7 @@ import {
   Badge,
   Button,
 } from '@mui/material';
-import { Bell, Check, CheckCheck, Ticket, Bell as BellIcon, AlertCircle, Trash2 } from 'lucide-react';
+import { Bell, Check, CheckCheck, Ticket, Bell as BellIcon, AlertCircle, Trash2, Maximize2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { markAsRead, markAllAsRead, clearNotifications } from '../../store/slices/notificationSlice';
@@ -113,6 +113,16 @@ const NotificationCenter = ({ anchorEl, open, onClose }) => {
           )}
         </Stack>
         <Stack direction="row" spacing={0.5}>
+          <IconButton
+            size="small"
+            onClick={() => {
+              navigate('/notifications');
+              onClose();
+            }}
+            title="Expand notifications"
+          >
+            <Maximize2 size={18} />
+          </IconButton>
           {unreadCount > 0 && (
             <IconButton size="small" onClick={handleMarkAllAsRead} title="Mark all as read">
               <CheckCheck size={18} />
