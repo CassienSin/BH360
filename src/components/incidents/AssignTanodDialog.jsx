@@ -39,24 +39,23 @@ const AssignTanodDialog = ({ open, onClose, incident }) => {
   // Mutation for assigning incident
   const assignIncidentMutation = useAssignIncident();
 
-  // AI-powered tanod suggestions
-  const [aiSuggestions, setAiSuggestions] = useState(null);
-
-  useEffect(() => {
-    if (incident && tanods.length > 0) {
-      try {
-        const suggestions = suggestTanodAssignment(incident, tanods, {});
-        setAiSuggestions(suggestions);
-        
-        // Auto-select top recommendation if no tanod is currently assigned
-        if (!incident.assignedTo && suggestions.recommendations?.length > 0) {
-          setSelectedTanodId(suggestions.recommendations[0].tanod.id);
-        }
-      } catch (error) {
-        console.error('Error getting AI suggestions:', error);
-      }
+  // AI-powered tanod suggestions - use useMemo to avoid setState in effect
+  const aiSuggestions = useMemo(() => {
+    if (!incident || !tanods || tanods.length === 0) return null;
+    try {
+      return suggestTanodAssignment(incident, tanods, {});
+    } catch (error) {
+      console.error('Error getting AI suggestions:', error);
+      return null;
     }
   }, [incident, tanods]);
+
+  // Auto-select top recommendation if no tanod is currently assigned
+  useEffect(() => {
+    if (aiSuggestions?.recommendations?.length > 0 && !incident?.assignedTo) {
+      setSelectedTanodId(aiSuggestions.recommendations[0].tanod.id);
+    }
+  }, [aiSuggestions, incident?.assignedTo]);
 
   // Get AI recommendation rank for a tanod
   const getTanodRecommendationRank = (tanodId) => {

@@ -38,9 +38,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { 
-  useAllIncidents, 
-  useUpdateIncident, 
+import {
+  useAllIncidents,
   useDeleteIncident,
   useResolveIncident,
 } from '../../hooks/useIncidents';
@@ -66,7 +65,6 @@ const AdminIncidentTable = () => {
 
   // Fetch incidents from Firebase
   const { data: incidents = [], isLoading, error } = useAllIncidents();
-  const updateIncident = useUpdateIncident();
   const deleteIncident = useDeleteIncident();
   const resolveIncident = useResolveIncident();
 

@@ -16,7 +16,7 @@ import {
 import { X, Star } from 'lucide-react';
 import { toast } from 'react-toastify';
 
-const FeedbackDialog = ({ open, onClose, onSubmit, type = 'ticket', itemTitle = '' }) => {
+const FeedbackDialog = ({ open, onClose, onSubmit, _type = 'ticket', itemTitle = '' }) => {
   const [ratings, setRatings] = useState({
     overallRating: 0,
     responseTime: 0,

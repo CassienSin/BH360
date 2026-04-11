@@ -24,20 +24,20 @@ import { useAppSelector } from '../../store/hooks';
 /**
  * Role-gated Quick Actions map.
  * Each action: { icon, label, path, paletteKey }
+ *
+ * captain / kagawad / secretary → staff-level actions
  */
+const STAFF_ACTIONS = [
+  { icon: AlertCircle, label: 'Report Incident', path: '/incidents/create', paletteKey: 'primary' },
+  { icon: Shield, label: 'Tanod Mgmt', path: '/tanod', paletteKey: 'info' },
+  { icon: Bell, label: 'Announcements', path: '/announcements', paletteKey: 'warning' },
+  { icon: BarChart3, label: 'Analytics', path: '/analytics', paletteKey: 'success' },
+];
+
 const ACTION_MAP = {
-  admin: [
-    { icon: AlertCircle, label: 'Report Incident', path: '/incidents/create', paletteKey: 'primary' },
-    { icon: Shield, label: 'Tanod Mgmt', path: '/tanod', paletteKey: 'info' },
-    { icon: Bell, label: 'Announcements', path: '/announcements', paletteKey: 'warning' },
-    { icon: BarChart3, label: 'Analytics', path: '/analytics', paletteKey: 'success' },
-  ],
-  staff: [
-    { icon: AlertCircle, label: 'Report Incident', path: '/incidents/create', paletteKey: 'primary' },
-    { icon: Shield, label: 'Tanod Mgmt', path: '/tanod', paletteKey: 'info' },
-    { icon: Bell, label: 'Announcements', path: '/announcements', paletteKey: 'warning' },
-    { icon: BarChart3, label: 'Analytics', path: '/analytics', paletteKey: 'success' },
-  ],
+  captain:   STAFF_ACTIONS,
+  kagawad:   STAFF_ACTIONS,
+  secretary: STAFF_ACTIONS,
   resident: [
     { icon: AlertCircle, label: 'Report Incident', path: '/incidents/create', paletteKey: 'primary' },
     { icon: MessageCircle, label: 'AI Help Desk', path: '/helpdesk', paletteKey: 'info' },

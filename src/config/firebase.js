@@ -15,6 +15,7 @@ import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -24,17 +25,30 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Validate configuration
-const isConfigValid = Object.values(firebaseConfig).every(
-  (value) => value !== undefined && value !== ''
+const measurementId = import.meta.env.VITE_FIREBASE_MEASUREMENT_ID;
+if (measurementId) {
+  firebaseConfig.measurementId = measurementId;
+}
+
+// Validate required configuration values
+const requiredConfigKeys = [
+  'apiKey',
+  'authDomain',
+  'projectId',
+  'storageBucket',
+  'messagingSenderId',
+  'appId',
+];
+
+const isConfigValid = requiredConfigKeys.every(
+  (key) => firebaseConfig[key] !== undefined && firebaseConfig[key] !== ''
 );
 
 if (!isConfigValid) {
   console.warn(
-    '⚠️ Firebase configuration is incomplete. Please add Firebase credentials to your .env file.'
+    '⚠️ Firebase configuration is incomplete. Please add required Firebase credentials to your .env file.'
   );
 }
 
@@ -44,6 +58,7 @@ let auth;
 let db;
 let storage;
 let analytics;
+let messaging;
 
 try {
   app = initializeApp(firebaseConfig);
@@ -52,6 +67,11 @@ try {
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
+  
+  // Initialize Messaging
+  if (typeof window !== 'undefined') {
+    messaging = getMessaging(app);
+  }
   
   // Initialize Analytics (only in production and if supported)
   if (import.meta.env.PROD) {
@@ -67,13 +87,10 @@ try {
     connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
     connectFirestoreEmulator(db, 'localhost', 8080);
     connectStorageEmulator(storage, 'localhost', 9199);
-    console.log('🔧 Connected to Firebase Emulators');
   }
-
-  console.log('✅ Firebase initialized successfully');
 } catch (error) {
-  console.error('❌ Firebase initialization error:', error);
+  console.error('Firebase initialization failed:', error);
 }
 
-export { app, auth, db, storage, analytics };
+export { app, auth, db, storage, analytics, messaging };
 export default app;

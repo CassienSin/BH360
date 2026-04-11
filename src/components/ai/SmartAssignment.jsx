@@ -1,7 +1,7 @@
 import { Stack, Card, CardContent, Typography, Box, Chip, alpha, useTheme, Avatar, Divider, LinearProgress } from '@mui/material';
 import { Users, Award, MapPin, Clock, Target, Star, CheckCircle } from 'lucide-react';
 
-const SmartAssignment = ({ assignmentData, incident }) => {
+const SmartAssignment = ({ assignmentData }) => {
   const theme = useTheme();
 
   if (!assignmentData || assignmentData.noAvailableMembers) {

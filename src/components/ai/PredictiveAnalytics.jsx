@@ -2,7 +2,7 @@ import { Stack, Card, CardContent, Typography, Box, Chip, alpha, useTheme, Grid 
 import { TrendingUp, TrendingDown, Activity, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
-const PredictiveAnalytics = ({ predictions, incidents }) => {
+const PredictiveAnalytics = ({ predictions }) => {
   const theme = useTheme();
 
   if (!predictions || predictions.trend === 'insufficient_data') {

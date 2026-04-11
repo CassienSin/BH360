@@ -179,7 +179,6 @@ const RequestsOverviewPanel = () => {
   ];
 
   const total = ticketStats?.total ?? 0;
-  const openRate = total > 0 ? Math.round(((ticketStats?.open ?? 0) / total) * 100) : 0;
   const resolvedRate = total > 0 ? Math.round(((ticketStats?.resolved ?? 0) / total) * 100) : 0;
 
   return (
