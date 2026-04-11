@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Stack,
@@ -16,39 +16,86 @@ import {
   Alert,
   AlertTitle,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControlLabel,
+  Checkbox,
+  Avatar,
+  Divider,
+  FormLabel,
+  RadioGroup,
+  Radio,
+  LinearProgress,
 } from '@mui/material';
-import { ArrowLeft, Upload, Sparkles, TrendingUp } from 'lucide-react';
+import {
+  ArrowLeft,
+  Upload,
+  Sparkles,
+  TrendingUp,
+  AlertTriangle,
+  AlertCircle,
+  Image as ImageIcon,
+  Loader,
+} from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-toastify';
+import { format } from 'date-fns';
+
 import { classifyIncident, calculatePriorityScore, suggestResponseActions } from '../../services/aiService';
 import ResponseSuggestions from '../../components/ai/ResponseSuggestions';
-import { useCreateIncident } from '../../hooks/useIncidents';
+import { useCreateIncident, useAllIncidents } from '../../hooks/useIncidents';
 import { useAppSelector } from '../../store/hooks';
+
+const CATEGORY_DESCRIPTIONS = {
+  crime: 'Criminal activities, theft, robbery, assault',
+  noise: 'Excessive noise, loud music, disturbance',
+  fire: 'Fire incidents, smoke, fire hazards',
+  dispute: 'Neighborhood disputes, conflicts',
+  hazard: 'Dangerous conditions, structural issues',
+  health: 'Health emergencies, accidents',
+  utility: 'Water, electricity, street, utility issues',
+  other: 'Other issues not listed above',
+};
+
+const CATEGORY_COLORS = {
+  crime: 'error',
+  noise: 'warning',
+  fire: 'error',
+  dispute: 'secondary',
+  hazard: 'info',
+  health: 'error',
+  utility: 'info',
+  other: 'default',
+};
 
 const IncidentCreate = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const { user } = useAppSelector((state) => state.auth);
   const createIncident = useCreateIncident();
-  
+  const { data: allIncidents = [] } = useAllIncidents();
+
+  // Form state
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: '',
     priority: '',
     location: '',
-    reporterName: '',
-    reporterContact: '',
+    coordinates: null,
+    requestedAction: 'investigation', // immediate, investigation, patrol, documentation
+    anonymous: false,
   });
-  // Issue #23: Update document title
-  useEffect(() => {
-    document.title = 'Report Incident – BH360';
-  }, []);
 
   const [aiClassification, setAiClassification] = useState(null);
   const [aiPriority, setAiPriority] = useState(null);
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [showAiInsights, setShowAiInsights] = useState(false);
+
+  const [selectedAddress, setSelectedAddress] = useState(null);
+  const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
 
   const { getRootProps, getInputProps, acceptedFiles } = useDropzone({
     accept: {
@@ -58,13 +105,21 @@ const IncidentCreate = () => {
     maxFiles: 5,
   });
 
+  useEffect(() => {
+    document.title = 'Report Incident – BH360';
+  }, []);
+
+  // Get reporter name and contact from user profile
+  const reporterName = user?.displayName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Anonymous';
+  const reporterContact = user?.email || user?.phone || '';
+  const userBarangay = user?.barangay || 'Unknown';
+
   // AI Classification when title and description change
   useEffect(() => {
     if (formData.title.length > 5 && formData.description.length > 10) {
       const classification = classifyIncident(formData.title, formData.description);
       setAiClassification(classification);
 
-      // Auto-suggest category if confidence is high
       if (classification.confidence >= 60 && !formData.category) {
         setFormData(prev => ({ ...prev, category: classification.category }));
       }
@@ -81,12 +136,10 @@ const IncidentCreate = () => {
       const priorityResult = calculatePriorityScore(incidentData);
       setAiPriority(priorityResult);
 
-      // Auto-suggest priority if not set
       if (!formData.priority) {
         setFormData(prev => ({ ...prev, priority: priorityResult.priority }));
       }
 
-      // Generate response suggestions
       const suggestions = suggestResponseActions({
         ...incidentData,
         priority: priorityResult.priority
@@ -96,42 +149,122 @@ const IncidentCreate = () => {
     }
   }, [formData.title, formData.description, formData.category, formData.location]);
 
+  // Find related incidents (same category or nearby area)
+  const relatedIncidents = useMemo(() => {
+    return allIncidents
+      .filter(incident =>
+        (incident.category === formData.category) &&
+        incident.status !== 'false-report' &&
+        incident.id !== formData.id
+      )
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 3);
+  }, [allIncidents, formData.category, formData.id]);
+
+  const handleAddressSelect = (address) => {
+    setSelectedAddress(address);
+    // Format location with coordinates if available
+    const displayLocation = `${address.barangay}, ${address.city} (${address.province})`;
+    setFormData(prev => ({
+      ...prev,
+      location: displayLocation,
+    }));
+  };
+
+  const handleMapCoordinateSelect = (coord) => {
+    setMapCoordinates(coord);
+
+    // Format coordinates as part of location string for map display
+    const coordStr = `(${coord[0].toFixed(6)}, ${coord[1].toFixed(6)})`;
+
+    // Update location with coordinates
+    setFormData(prev => {
+      const locationWithoutCoords = prev.location.split('(')[0].trim() || 'Custom Location';
+      return {
+        ...prev,
+        location: `${locationWithoutCoords} ${coordStr}`,
+      };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
+    if (user?.blacklisted) {
+      toast.error('Your account is blocked from submitting reports.');
+      return;
+    }
+
+    setVerificationDialogOpen(true);
+  };
+
+  const handleConfirmSubmit = async () => {
     try {
-      // Prepare incident data for Firebase
       const incidentData = {
         title: formData.title,
         description: formData.description,
         category: formData.category,
         priority: formData.priority || aiPriority?.priority || 'medium',
         location: formData.location,
-        reporterName: formData.reporterName || user?.displayName || 'Anonymous',
-        reporterContact: formData.reporterContact || user?.email || '',
+        reporterName: formData.anonymous ? 'Anonymous' : reporterName,
+        reporterContact: formData.anonymous ? '' : reporterContact,
         userId: user?.uid || null,
+        requestedAction: formData.requestedAction,
+        anonymous: formData.anonymous,
         status: 'submitted',
-        // Include AI analysis data
         aiAnalysis: {
           classification: aiClassification,
           priorityScore: aiPriority,
           suggestions: aiSuggestions,
         },
       };
-      
-      // Save to Firebase
+
       await createIncident.mutateAsync(incidentData);
-      
-      // Success toast is automatically shown by the hook
+      setVerificationDialogOpen(false);
       navigate('/incidents');
     } catch (error) {
       console.error('Error creating incident:', error);
-      // Error toast is automatically shown by the hook
     }
   };
 
+  // Block if user is blacklisted
+  if (user?.blacklisted) {
+    return (
+      <Stack spacing={3}>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowLeft size={18} />}
+          size="small"
+          onClick={() => navigate('/incidents')}
+          sx={{ width: 'fit-content' }}
+        >
+          Back
+        </Button>
+
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          <AlertTitle>Account Blocked</AlertTitle>
+          <Typography variant="body2" paragraph>
+            Your account has been blocked from submitting incident reports due to repeated false reports.
+          </Typography>
+          <Typography variant="body2" color="inherit">
+            If you believe this is incorrect, you can request an appeal through your profile settings.
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            sx={{ mt: 1 }}
+            onClick={() => navigate('/profile')}
+          >
+            View Appeal Status
+          </Button>
+        </Alert>
+      </Stack>
+    );
+  }
+
   return (
     <Stack spacing={3}>
+      {/* Header */}
       <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
         <Button
           variant="outlined"
@@ -142,7 +275,6 @@ const IncidentCreate = () => {
         >
           Back
         </Button>
-        {/* Issue #6, #13: h1 component + gradient text */}
         <Typography
           variant="h4"
           component="h1"
@@ -154,116 +286,217 @@ const IncidentCreate = () => {
         </Typography>
       </Stack>
 
-      <form onSubmit={handleSubmit}>
-        <Card
-          elevation={0}
-          sx={{
-            borderRadius: 3,
-            border: `1px solid ${theme.palette.divider}`,
-          }}
-        >
-          <CardContent>
-            <Stack spacing={3}>
-              <TextField
-                label="Incident Title"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                required
-                fullWidth
-                placeholder="Brief summary of the incident"
-              />
+      {/* User Warning Status */}
+      {user?.falseReportWarnings > 0 && (
+        <Alert severity="warning" sx={{ borderRadius: 2 }}>
+          <AlertTitle>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <AlertTriangle size={18} />
+              <span>Account Warning</span>
+            </Stack>
+          </AlertTitle>
+          <Typography variant="body2">
+            You have <strong>{user.falseReportWarnings}</strong> false report warning(s).
+            {user.falseReportWarnings >= 2 && ' One more warning will result in account suspension.'}
+          </Typography>
+        </Alert>
+      )}
 
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-                <TextField
-                  label="Your Name"
-                  value={formData.reporterName}
-                  onChange={(e) => setFormData({ ...formData, reporterName: e.target.value })}
-                  fullWidth
-                  placeholder={user?.displayName || 'Your name'}
-                />
-
-                <TextField
-                  label="Contact Number"
-                  value={formData.reporterContact}
-                  onChange={(e) => setFormData({ ...formData, reporterContact: e.target.value })}
-                  fullWidth
-                  placeholder={user?.email || 'Your contact info'}
-                />
-              </Stack>
-
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-                <TextField
-                  select
-                  label="Category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  required
-                  fullWidth
-                  helperText={
-                    aiClassification && aiClassification.confidence >= 60 ? (
-                      <Stack direction="row" spacing={0.5} alignItems="center" component="span">
-                        <Sparkles size={12} />
-                        <span>AI Suggestion: {aiClassification.category} ({aiClassification.confidence}% confidence)</span>
-                      </Stack>
-                    ) : null
-                  }
-                >
-                  <MenuItem value="crime">Crime</MenuItem>
-                  <MenuItem value="noise">Noise</MenuItem>
-                  <MenuItem value="fire">Fire</MenuItem>
-                  <MenuItem value="dispute">Dispute</MenuItem>
-                  <MenuItem value="hazard">Hazard</MenuItem>
-                  <MenuItem value="health">Health</MenuItem>
-                  <MenuItem value="utility">Utility</MenuItem>
-                  <MenuItem value="other">Other</MenuItem>
-                </TextField>
-
-                <TextField
-                  select
-                  label="Priority"
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  required
-                  fullWidth
-                  helperText={
-                    aiPriority ? (
-                      <Stack direction="row" spacing={0.5} alignItems="center" component="span">
-                        <TrendingUp size={12} />
-                        <span>AI Score: {aiPriority.score}/100 - Suggested: {aiPriority.priority}</span>
-                      </Stack>
-                    ) : null
-                  }
-                >
-                  <MenuItem value="minor">Minor</MenuItem>
-                  <MenuItem value="urgent">Urgent</MenuItem>
-                  <MenuItem value="emergency">Emergency</MenuItem>
-                </TextField>
-              </Stack>
-
-              <TextField
-                label="Location"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                required
-                fullWidth
-                placeholder="e.g., Purok 3, Barangay Hall Area"
-              />
-
-              <TextField
-                label="Description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                required
-                fullWidth
-                multiline
-                rows={4}
-                placeholder="Provide detailed information about the incident..."
-              />
-
-              <Box>
-                <Typography variant="subtitle2" fontWeight={600} mb={1}>
-                  Upload Photos/Videos (Optional)
+      {/* User Profile Card */}
+      <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+        <CardContent>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+            <Avatar
+              sx={{
+                width: 56,
+                height: 56,
+                bgcolor: theme.palette.primary.light,
+                color: theme.palette.primary.main,
+                fontSize: '1.5rem',
+                fontWeight: 700,
+              }}
+            >
+              {reporterName.charAt(0)}
+            </Avatar>
+            <Stack spacing={0.5} flex={1}>
+              <Typography variant="h6" fontWeight={700}>
+                {reporterName}
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <Typography variant="body2" color="text.secondary">
+                  📍 {userBarangay}
                 </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  📧 {reporterContact}
+                </Typography>
+              </Stack>
+            </Stack>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.anonymous}
+                  onChange={(e) => setFormData({ ...formData, anonymous: e.target.checked })}
+                />
+              }
+              label="Report anonymously"
+              sx={{ mb: 0, whiteSpace: 'nowrap' }}
+            />
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <form onSubmit={handleSubmit}>
+        <Stack spacing={3}>
+          {/* Quick Info - Category & Priority */}
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                select
+                label="Category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                required
+                fullWidth
+                helperText={
+                  formData.category
+                    ? CATEGORY_DESCRIPTIONS[formData.category]
+                    : aiClassification?.confidence >= 60
+                    ? `AI Suggestion: ${aiClassification.category} (${aiClassification.confidence}%)`
+                    : null
+                }
+              >
+                {Object.entries(CATEGORY_DESCRIPTIONS).map(([key, desc]) => (
+                  <MenuItem key={key} value={key}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Box
+                        sx={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          backgroundColor: theme.palette[CATEGORY_COLORS[key]]?.main || theme.palette.grey[500],
+                        }}
+                      />
+                      <span style={{ textTransform: 'capitalize' }}>{key}</span>
+                    </Stack>
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                select
+                label="Priority"
+                value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                required
+                fullWidth
+                helperText={
+                  aiPriority
+                    ? `AI Score: ${aiPriority.score}/100`
+                    : null
+                }
+              >
+                <MenuItem value="minor">Minor</MenuItem>
+                <MenuItem value="medium">Medium</MenuItem>
+                <MenuItem value="urgent">Urgent</MenuItem>
+                <MenuItem value="emergency">Emergency</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+
+          {/* Incident Details Card */}
+          <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  Incident Details
+                </Typography>
+
+                <TextField
+                  label="Incident Title"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  required
+                  fullWidth
+                  placeholder="Brief summary of the incident"
+                />
+
+                <TextField
+                  label="Description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  required
+                  fullWidth
+                  multiline
+                  rows={4}
+                  placeholder="Provide detailed information about what happened..."
+                />
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* Location Selection Card */}
+          <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  Location
+                </Typography>
+
+                <TextField
+                  fullWidth
+                  label="Incident Location (Street Address, Barangay, etc.)"
+                  placeholder="e.g., Poblacion, Toledo City, Cebu"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  multiline
+                  rows={2}
+                  variant="outlined"
+                  size="small"
+                />
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* Response Needed Card */}
+          <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  What Response Do You Need?
+                </Typography>
+
+                <FormLabel component="legend" sx={{ fontWeight: 500 }}>
+                  Type of Response Needed
+                </FormLabel>
+                <RadioGroup
+                  value={formData.requestedAction}
+                  onChange={(e) => setFormData({ ...formData, requestedAction: e.target.value })}
+                >
+                  <FormControlLabel value="immediate" control={<Radio />} label="Immediate assistance needed" />
+                  <FormControlLabel value="investigation" control={<Radio />} label="Investigation required" />
+                  <FormControlLabel value="patrol" control={<Radio />} label="Preventive patrol" />
+                  <FormControlLabel value="documentation" control={<Radio />} label="Documentation only" />
+                </RadioGroup>
+
+                {formData.requestedAction === 'immediate' && (
+                  <Alert severity="error" sx={{ borderRadius: 2 }}>
+                    This incident will be marked as high priority for immediate response.
+                  </Alert>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* Evidence Card */}
+          <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  Evidence / Photos (Optional)
+                </Typography>
+
                 <Box
                   {...getRootProps()}
                   sx={{
@@ -282,88 +515,218 @@ const IncidentCreate = () => {
                   <input {...getInputProps()} />
                   <Upload size={32} color={theme.palette.text.secondary} style={{ marginBottom: 8 }} />
                   <Typography variant="body2" color="text.secondary">
-                    Drag & drop files here, or click to select
+                    Drag & drop photos or videos here, or click to select
                   </Typography>
-                  {acceptedFiles.length > 0 && (
-                    <Typography variant="caption" color="primary.main" mt={1}>
-                      {acceptedFiles.length} file(s) selected
-                    </Typography>
-                  )}
+                  <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 1 }}>
+                    Max 5 files (images or videos)
+                  </Typography>
                 </Box>
-              </Box>
 
-              {showAiInsights && aiClassification && aiPriority && (
-                <Alert
-                  severity="info"
-                  icon={<Sparkles size={20} />}
-                  sx={{
-                    borderRadius: 2,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                  }}
-                >
-                  <AlertTitle sx={{ fontWeight: 700 }}>AI Analysis Complete</AlertTitle>
-                  <Typography variant="body2" mb={1}>
-                    Classification: <strong>{aiClassification.category}</strong> ({aiClassification.confidence}% confidence) | 
-                    Priority Score: <strong>{aiPriority.score}/100</strong>
+                {acceptedFiles.length > 0 && (
+                  <Box>
+                    <Typography variant="body2" fontWeight={600} mb={1}>
+                      {acceptedFiles.length} file(s) selected:
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      {acceptedFiles.map((file, idx) => (
+                        <Chip
+                          key={idx}
+                          icon={file.type.startsWith('image/') ? <ImageIcon size={16} /> : <Upload size={16} />}
+                          label={`${file.name.substring(0, 15)}...`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* Related Incidents */}
+          {relatedIncidents.length > 0 && (
+            <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, bgcolor: alpha(theme.palette.info.main, 0.05) }}>
+              <CardContent>
+                <Stack spacing={2}>
+                  <Typography variant="subtitle1" fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <AlertCircle size={18} />
+                    Similar Recent Incidents
                   </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
-                    {aiClassification.alternativeCategories && aiClassification.alternativeCategories.map(cat => (
-                      <Chip
-                        key={cat.category}
-                        label={`${cat.category} (${cat.confidence}%)`}
-                        size="small"
+                  <Typography variant="body2" color="text.secondary">
+                    Are any of these incidents related to what you're reporting?
+                  </Typography>
+
+                  <Stack spacing={1}>
+                    {relatedIncidents.map((incident) => (
+                      <Box
+                        key={incident.id}
                         sx={{
-                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                          color: theme.palette.primary.main
+                          p: 1.5,
+                          borderRadius: 1,
+                          border: `1px solid ${theme.palette.divider}`,
+                          cursor: 'pointer',
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) },
                         }}
-                      />
+                        onClick={() => navigate(`/incidents/${incident.id}`)}
+                      >
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>
+                              {incident.title}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {format(incident.createdAt?.toDate?.() || new Date(incident.createdAt), 'MMM dd, yyyy HH:mm')}
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={incident.status}
+                            size="small"
+                            variant="outlined"
+                            sx={{ textTransform: 'capitalize' }}
+                          />
+                        </Stack>
+                      </Box>
                     ))}
                   </Stack>
-                </Alert>
-              )}
+                </Stack>
+              </CardContent>
+            </Card>
+          )}
 
-              <Stack direction="row" spacing={2} justifyContent="flex-end">
-                <Button
-                  variant="outlined"
-                  onClick={() => navigate('/incidents')}
-                  disabled={createIncident.isPending}
-                >
-                  Cancel
-                </Button>
-                 {/* Issue #26: Responsive button text — shorter on mobile */}
-                <Button
-                  type="submit"
-                  variant="contained"
-                  startIcon={createIncident.isPending ? <CircularProgress size={18} /> : <Sparkles size={18} />}
-                  disabled={createIncident.isPending}
-                >
-                  {createIncident.isPending ? (
-                    'Submitting…'
-                  ) : (
-                    <>
-                      <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                        Submit Report with AI Analysis
-                      </Box>
-                      <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
-                        Submit Report
-                      </Box>
-                    </>
-                  )}
-                </Button>
+          {/* AI Analysis */}
+          {showAiInsights && aiClassification && aiPriority && (
+            <Alert
+              severity="info"
+              icon={<Sparkles size={20} />}
+              sx={{
+                borderRadius: 2,
+                backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+              }}
+            >
+              <AlertTitle sx={{ fontWeight: 700 }}>AI Analysis</AlertTitle>
+              <Stack spacing={1} variant="body2">
+                <Typography variant="body2">
+                  <strong>Category:</strong> {aiClassification.category} ({aiClassification.confidence}% confidence)
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Priority Score:</strong> {aiPriority.score}/100 → {aiPriority.priority}
+                </Typography>
               </Stack>
-            </Stack>
-          </CardContent>
-        </Card>
+            </Alert>
+          )}
+
+          {/* Submit Button */}
+          <Stack direction="row" spacing={2} justifyContent="flex-end">
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/incidents')}
+              disabled={createIncident.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={createIncident.isPending ? <CircularProgress size={18} /> : <Sparkles size={18} />}
+              disabled={createIncident.isPending}
+            >
+              {createIncident.isPending ? 'Submitting…' : 'Review & Submit'}
+            </Button>
+          </Stack>
+        </Stack>
       </form>
 
       {/* AI Response Suggestions */}
       {showAiInsights && aiSuggestions.length > 0 && (
         <ResponseSuggestions suggestions={aiSuggestions} />
       )}
+
+      {/* Verification Dialog */}
+      <Dialog
+        open={verificationDialogOpen}
+        onClose={() => !createIncident.isPending && setVerificationDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <AlertCircle size={20} />
+            <span>Review Your Report</span>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 2 }}>
+            <Box>
+              <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                Reporter
+              </Typography>
+              <Typography variant="body2">
+                {formData.anonymous ? 'Anonymous' : reporterName} {reporterContact && !formData.anonymous ? `(${reporterContact})` : ''}
+              </Typography>
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                Incident
+              </Typography>
+              <Typography variant="body2">
+                <strong>Title:</strong> {formData.title}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Category:</strong> {formData.category}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Priority:</strong> {formData.priority}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Location:</strong> {formData.location}
+              </Typography>
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                Details
+              </Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {formData.description}
+              </Typography>
+            </Box>
+
+            <Divider />
+
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              <Typography variant="body2">
+                By submitting this report, you confirm that the information is accurate and truthful.
+                False reports may result in account warnings or suspension.
+              </Typography>
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setVerificationDialogOpen(false)}
+            disabled={createIncident.isPending}
+          >
+            Edit
+          </Button>
+          <Button
+            onClick={handleConfirmSubmit}
+            variant="contained"
+            disabled={createIncident.isPending}
+            startIcon={createIncident.isPending ? <Loader size={18} /> : <Sparkles size={18} />}
+          >
+            {createIncident.isPending ? 'Submitting…' : 'Confirm & Submit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 };
 
 export default IncidentCreate;
-
